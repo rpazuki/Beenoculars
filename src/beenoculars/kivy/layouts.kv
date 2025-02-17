@@ -1,0 +1,200 @@
+#:kivy 1.0.9
+#:import win kivy.core.window
+<BoxLayoutApp>:
+    orientation: 'vertical'
+    on_size: root.picture.reset_image_position_and_size()
+    BoxLayout:
+        orientation: 'horizontal'
+        padding: 5
+        spacing: 5
+        size_hint: 1, None
+        height: '30dp'
+        pos_hint: {'top': 1}
+        # border: 4, 4, 4, 4
+        # canvas.before:
+        #     Color:
+        #         rgba: .5, .0, .0, 1
+        #     Line:
+        #         width: 2
+        #         rectangle: self.x, self.y, self.width, self.height
+        Button:
+            text: 'Open'
+            id: file_open_cv
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+            # on_press : root.test()
+            # on_release: root.open()
+        Button:
+            text: 'Capture'
+            id: capture
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+            # on_release: root.load_image_from_camera_cv()
+        Label:
+            text: 'Grey'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Switch:
+            id: change_grey
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Label:
+            text: 'B&W'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Switch:
+            id: change_black_white
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Label:
+            text: 'Contours'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Switch:
+            id: draw_contours
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Label:
+            text: 'Count:??'
+            id: lb_count
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+    BoxLayout:
+        orientation: 'horizontal'
+        padding: 5
+        spacing: 5
+        size_hint: 1, None
+        height: '30dp'
+        pos_hint: {'top': 1}
+        border: 4, 4, 4, 4
+        Label:
+            text: 'Thickness'
+            id: threshold_label
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+            width: '10dp'
+        Spinner:
+            id: number_thickness
+            size_hint: None, None
+            size: 20, 20
+            text: '1'
+            values: '1', '2', '3', '4', '5'
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+            width: '20dp'
+
+        Label:
+            text: 'Threshold:127'
+            id: threshold_label
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Slider:
+            id: change_overlay_threshold
+            min: 0
+            max: 255
+            step: 1
+            value: 127
+            value_track: True
+            orientation: 'horizontal'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        Label:
+            text: 'Percentage:90-100'
+            id: percentage_label
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            pos_hint: {'top': 1.}
+            height: '30dp'
+        BoxLayout:
+            orientation: 'vertical'
+            padding: 1
+            spacing: 1
+            size_hint: 1, None
+            height: '60dp'
+            pos_hint: {'top': 1}
+            border: 4, 4, 4, 4
+            Slider:
+                id: change_overlay_percentage_1
+                min: 90
+                max: 100
+                step: .2
+                value: 90
+                value_track: True
+                orientation: 'horizontal'
+                size_hint_y: None
+                padding: 5
+                spacing: 5
+                pos_hint: {'top': 1.}
+                height: '25dp'
+            Slider:
+                id: change_overlay_percentage_2
+                min: 90
+                max: 100
+                step: .2
+                value: 100
+                value_track: True
+                orientation: 'horizontal'
+                size_hint_y: None
+                padding: 5
+                spacing: 5
+                pos_hint: {'top': 1.}
+                height: '25dp'
+<PictureLayout>:
+    Scatter:
+        # on_size: self.center =  win.Window.center
+        # center: self.parent.center
+        # size: image.size
+        # size: 400, 400 / image.image_ratio
+        size_hint: None, None
+        do_rotation: False
+        do_scale: False
+        do_translation: True
+        Image:
+            id: image
+            # size: 400, 400 / self.image_ratio
+            source: 'data/logo/kivy-icon-24.png'
+            canvas.before:
+                Color:
+                    rgba: .5, .0, .0, 1
+                Line:
+                    width: 2
+                    rectangle: self.x, self.y, self.width, self.height
