@@ -182,7 +182,7 @@ requires = [
     "toga-iOS~=0.4.7",
     "std-nslog~=1.0.3",
 ]
-#requirement_installer_args = ["--find-links", "/Users/rp/flet-mobile-forge/dist/"]
+requirement_installer_args = ["--find-links", "/Users/rp/ios_libs/mobile-forge/dist/"]
 permission.camera = "This iOS app uses the camera"
 permission.NSCameraUsageDescription = "This iOS app uses the camera"
 pernision.NSPhotoLibraryAddUsageDescription = "This iOS app uses photos"

@@ -1,5 +1,5 @@
 from .image_services import AsyncImageService, SyncImageService
-from .pipelines import ImageProcessingPipeline, Process
+from .pipelines import ImageProcessingPipeline, Process, processLogic
 from .processes import OverlayContoursProcess as __OverlayContoursProcess__
 from .processes import ProcessesRegistry
 from .processes import ToBlackWhiteProcess as __ToBlackWhiteProcess__
