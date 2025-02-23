@@ -2,7 +2,6 @@ import logging
 from abc import abstractmethod
 
 import toga
-from toga.constants import Direction
 from toga.style import Pack
 from toga.style.pack import CENTER, COLUMN, ROW
 
@@ -62,6 +61,8 @@ class TwoColumnsLayout(InterpreterLayout):
 
         def clear(widget):
             self.code_textbox.value = ""
+
+        def clear_output(widget):
             self.output_textbox.value = ""
 
         def run(widget):
@@ -75,36 +76,65 @@ class TwoColumnsLayout(InterpreterLayout):
                 exec(cc)
                 sys.stdout = old_stdout
                 out = mystdout.getvalue()
-                self.output_textbox.value = out
+                self.output_textbox.value += "---------\n" + out
             except Exception as e:
-                self.output_textbox.value = f"Error: \n {e}{chain_traceback(e.__traceback__)}"
+                self.output_textbox.value += "---------\n" + \
+                    f"Error: \n {e}{chain_traceback(e.__traceback__)}"
 
             self.output_textbox.scroll_to_bottom()
 
-        btn_run = toga.Button("Run", style=Pack(padding=4),
+        btn_run = toga.Button("Run", style=Pack(padding=4, font_size=10),
                               on_press=run)
-        btn_clear = toga.Button("Clear", style=Pack(padding=4),
+        btn_clear = toga.Button("Clear", style=Pack(padding=4, color='red', font_size=10),
                                 on_press=clear)
+        #
+
+        def change_run_font(widget):
+            self.code_textbox.style.update(
+                font_size=widget.value
+            )
+            self.line_num_textbox.style.update(
+                font_size=widget.value,
+                width=int(35*widget.value/14)
+            )
+        sl_run_font_size = toga.Selection(
+            items=[8, 10, 12, 14, 16, 18, 20, 24, 28, 32], value=14,
+            on_change=change_run_font,
+            style=Pack(padding=4, width=50, font_size=10))
+        #
+        btn_output_clear = toga.Button("Clear out",
+                                       style=Pack(
+                                           padding=4, color='red', font_size=10),
+                                       on_press=clear_output)
+
+        def change_output_font(widget):
+            self.output_textbox.style.update(
+                font_size=widget.value
+            )
+        sl_output_font_size = toga.Selection(
+            items=[8, 10, 12, 14, 16, 18, 20, 24, 28, 32], value=14,
+            on_change=change_output_font,
+            style=Pack(padding=4, width=50, font_size=10))
+        #
         b1.add(btn_run)
         b1.add(btn_clear)
+        b1.add(sl_run_font_size)
+        b1.add(btn_output_clear)
+        b1.add(sl_output_font_size)
         #
         b2 = toga.Box(style=Pack(
-            direction=ROW, alignment=CENTER, flex=1))
+            direction=COLUMN, alignment=CENTER, flex=1))
         b.add(b2)
         #
-        split = toga.SplitContainer(direction=Direction.HORIZONTAL,
-                                    style=Pack(padding=0, flex=1))
-        b2.add(split)
-        #
         c1 = toga.Box(style=Pack(
-            direction=COLUMN, alignment=CENTER, flex=1))
+            direction=COLUMN, alignment=CENTER, flex=2))
 
         c1r1 = toga.Box(style=Pack(
             direction=ROW, alignment=CENTER, flex=1))
         c1.add(c1r1)
         self.line_num_textbox = toga.MultilineTextInput(value="".join(
             [f"{i+1}\n" for i in range(100)]), readonly=True,
-            style=Pack(width=25, color='red', padding=0, font_size=14))
+            style=Pack(width=35, color='red', padding=0, font_size=14))
         c1r1.add(self.line_num_textbox)
         self.code_textbox = toga.MultilineTextInput(
             value="""import os
@@ -121,7 +151,8 @@ f.close()""",
         self.output_textbox = toga.MultilineTextInput(
             readonly=True, style=Pack(padding=5, flex=1))
         c2.add(self.output_textbox)
-        split.content = [c1, c2]
+        b2.add(c1)
+        b2.add(c2)
         #
         self.main_box.add(b)
 

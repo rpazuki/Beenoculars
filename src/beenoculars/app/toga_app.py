@@ -32,7 +32,7 @@ def create_app():
     log.info("Python Interpreter app stars")
 
     ServiceRegistry().ui_framework = UIFramework.TOGA
-    app = InterpreterApp("PythonInterpreter")
+    app = InterpreterApp("")
     return app
 
 
