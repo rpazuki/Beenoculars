@@ -70,6 +70,12 @@ def ios_bindings(app):
     )
 
 
+def ipados_bindings(app):
+    ServiceRegistry().bind_event(
+        Event("capture", EventType.ON_PRESS, CaptureByTakePhoto())
+    )
+
+
 def windows_bindings(app):
     ServiceRegistry().bind_event(
         Event("capture", EventType.ON_PRESS, CaptureByOpenCV())
@@ -90,6 +96,8 @@ def init_event_bindings(app):
             darwin_bindings(app)
         case "ios":
             ios_bindings(app)
+        case "ipados":
+            ipados_bindings(app)
         case "windows":
             windows_bindings(app)
         case _:
