@@ -2,10 +2,12 @@ import logging
 from abc import abstractmethod
 
 import toga
+from toga.constants import Direction
 from toga.style import Pack
 from toga.style.pack import CENTER, COLUMN, ROW
 
 from beenoculars.core import AbstractApp, AbstractLayout
+from beenoculars.core.__safe_calls__ import __chain_traceback as chain_traceback
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class TwoColumnsLayout(InterpreterLayout):
                 out = mystdout.getvalue()
                 self.output_textbox.value = out
             except Exception as e:
-                self.output_textbox.value = f"Error: \n {e}"
+                self.output_textbox.value = f"Error: \n {e}{chain_traceback(e.__traceback__)}"
 
             self.output_textbox.scroll_to_bottom()
 
@@ -89,8 +91,21 @@ class TwoColumnsLayout(InterpreterLayout):
         b2 = toga.Box(style=Pack(
             direction=ROW, alignment=CENTER, flex=1))
         b.add(b2)
+        #
+        split = toga.SplitContainer(direction=Direction.HORIZONTAL,
+                                    style=Pack(padding=0, flex=1))
+        b2.add(split)
+        #
         c1 = toga.Box(style=Pack(
             direction=COLUMN, alignment=CENTER, flex=1))
+
+        c1r1 = toga.Box(style=Pack(
+            direction=ROW, alignment=CENTER, flex=1))
+        c1.add(c1r1)
+        self.line_num_textbox = toga.MultilineTextInput(value="".join(
+            [f"{i+1}\n" for i in range(100)]), readonly=True,
+            style=Pack(width=25, color='red', padding=0, font_size=14))
+        c1r1.add(self.line_num_textbox)
         self.code_textbox = toga.MultilineTextInput(
             value="""import os
 print(os.getcwd())
@@ -99,15 +114,14 @@ if not os.path.isdir('test'):
 f=open('test.txt', 'w')
 f.write('something')
 f.close()""",
-            style=Pack(padding=5, flex=1))
-        c1.add(self.code_textbox)
+            style=Pack(padding=0, font_size=14, flex=1))
+        c1r1.add(self.code_textbox)
         c2 = toga.Box(style=Pack(
             direction=COLUMN, alignment=CENTER, flex=1))
         self.output_textbox = toga.MultilineTextInput(
             readonly=True, style=Pack(padding=5, flex=1))
         c2.add(self.output_textbox)
-        b2.add(c1)
-        b2.add(c2)
+        split.content = [c1, c2]
         #
         self.main_box.add(b)
 

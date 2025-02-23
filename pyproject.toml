@@ -1,7 +1,7 @@
 # This project was generated with 0.3.22 using template: https://github.com/beeware/briefcase-template@v0.3.22
 [tool.briefcase]
-project_name = "Beenoculars"
-bundle = "com.beenoculars"
+project_name = "PythonInterpreter"
+bundle = "com.PythonInterpreter"
 version = "0.0.1"
 url = "https://beenoculars.com/beenoculars"
 license.file = "LICENSE"
@@ -9,7 +9,7 @@ author = "Roozbeh H. Pazuki"
 author_email = "rpazuki@gmail.com"
 
 [tool.briefcase.app.beenoculars]
-formal_name = "Beenoculars"
+formal_name = "Python_Interpreter"
 description = "Studying bees diseases by analysing photos"
 long_description = """More details about the app should go here.
 """
