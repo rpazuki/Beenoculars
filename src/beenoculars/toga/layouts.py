@@ -285,6 +285,7 @@ class LayoutApp(AbstractApp, toga.App):
         to UI elements on_press call back, if their ids correspond to
         an id in ServiceRegistry.
         """
+        self.commands.clear()
         self.main_window = toga.MainWindow(title=self.formal_name)
         #
         self.on_begin()
