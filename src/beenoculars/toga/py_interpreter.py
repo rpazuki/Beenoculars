@@ -125,7 +125,7 @@ class TwoColumnsLayout(InterpreterLayout):
         b2 = toga.Box(style=Pack(
             direction=COLUMN, alignment=CENTER, flex=1))
         b.add(b2)
-        #
+        ##
         c1 = toga.Box(style=Pack(
             direction=COLUMN, alignment=CENTER, flex=2))
 
