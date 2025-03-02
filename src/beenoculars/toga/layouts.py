@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 import toga
 from toga.style import Pack
-from toga.style.pack import CENTER, COLUMN, ROW
+from toga.style.pack import CENTER, COLUMN, ROW  # type: ignore
 
 import beenoculars.core as core
 from beenoculars.core import AbstractApp, AbstractLayout
@@ -18,14 +18,18 @@ class Layout(AbstractLayout):
         self._image_view = None
 
     @property
-    def main_box(self):
+    def main_box(self) -> toga.Box:
+        if self._main_box is None:
+            raise ValueError("Main box has not been initialized.")
         return self._main_box
 
     @property
-    def image_view(self):
+    def image_view(self) -> toga.ImageView:
+        if self._image_view is None:
+            raise ValueError("Main box has not been initialized.")
         return self._image_view
 
-    def build_layout(self):
+    def build_layout(self) -> toga.Box:
         """Build the main window of the app and its layout.
         """
         self._main_box = toga.Box(
@@ -94,7 +98,7 @@ class TopToolbarLayout(Layout):
         #
 
         def swt_gray_on_change(widget,  *args):
-            if self.swt_gray.value:
+            if self.swt_gray.value and self.swt_black_white.value:
                 self.swt_black_white.value = False
         self.swt_gray = toga.Switch("Grey:",
                                     id="change_grey",
@@ -104,7 +108,7 @@ class TopToolbarLayout(Layout):
         #
 
         def swt_black_white_on_change(widget,  *args):
-            if self.swt_black_white.value:
+            if self.swt_black_white.value and self.swt_gray.value:
                 self.swt_gray.value = False
 
         self.swt_black_white = toga.Switch("B&W:",
@@ -179,7 +183,7 @@ class TopToolbarLayout(Layout):
         toolbar_r4.add(s_label)
         #
         self.slider_percentage_label = toga.Label(
-            "90-100", style=Pack(width=25))
+            "50-100", style=Pack(width=25))
         toolbar_r4.add(self.slider_percentage_label)
         #
 
@@ -192,14 +196,14 @@ class TopToolbarLayout(Layout):
         sliders_box = toga.Box(style=Pack(
             direction=COLUMN, alignment=CENTER, width=290, padding=5, flex=1))
         self.slider_percentage_level_1 = toga.Slider(
-            value=90, min=90, max=100,
+            value=50, min=50, max=100,
             id="change_overlay_percentage_1",
             tick_count=200,
             style=Pack(padding=5, width=290),
             on_change=update_percentage_label
         )
         self.slider_percentage_level_2 = toga.Slider(
-            value=100, min=90, max=100,
+            value=100, min=50, max=100,
             id="change_overlay_percentage_2",
             tick_count=200,
             style=Pack(padding=5, width=290),
@@ -259,10 +263,11 @@ class LayoutApp(AbstractApp, toga.App):
                                         formal_name=formal_name,
                                         app_id=app_id,
                                         )
+        self.layout = layout
         self._original_image = None
 
     @property
-    def image_view(self):
+    def image_view(self) -> toga.ImageView:
         return self.layout.image_view
 
     @property
@@ -289,9 +294,9 @@ class LayoutApp(AbstractApp, toga.App):
         #
         self.on_begin()
         #
-        self.main_window.content = self.layout.main_box
+        self.main_window.content = self.layout.main_box  # type: ignore
         #
-        self.main_window.show()
+        self.main_window.show()  # type: ignore
 
     def on_exit(self):
         self.on_end()

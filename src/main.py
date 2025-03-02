@@ -1,7 +1,7 @@
 import logging
 import os
 
-from kivy.lang import Builder
+from kivy.lang import Builder  # type: ignore
 
 from beenoculars.app.kivy_app import create_app as create_kivy_app
 

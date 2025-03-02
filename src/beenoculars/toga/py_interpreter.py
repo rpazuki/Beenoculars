@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 import toga
 from toga.style import Pack
-from toga.style.pack import CENTER, COLUMN, ROW
+from toga.style.pack import CENTER, COLUMN, ROW  # type: ignore
 
 from beenoculars.core import AbstractApp, AbstractLayout
 
@@ -16,10 +16,12 @@ class InterpreterLayout(AbstractLayout):
         self._main_box = None
 
     @property
-    def main_box(self):
+    def main_box(self) -> toga.Box:
+        if self._main_box is None:
+            raise ValueError("Main box has not been initialized.")
         return self._main_box
 
-    def build_layout(self):
+    def build_layout(self) -> toga.Box:
         """Build the main window of the app and its layout.
         """
         self._main_box = toga.Box(
@@ -125,6 +127,7 @@ class InterpreterLayoutApp(AbstractApp, toga.App):
                                                    formal_name=formal_name,
                                                    app_id=app_id,
                                                    )
+        self.layout = layout
 
     def startup(self):
         """Construct and show the Toga application.
@@ -137,9 +140,9 @@ class InterpreterLayoutApp(AbstractApp, toga.App):
         #
         self.on_begin()
         #
-        self.main_window.content = self.layout.main_box
+        self.main_window.content = self.layout.main_box  # type: ignore
         #
-        self.main_window.show()
+        self.main_window.show()  # type: ignore
 
     def on_exit(self):
         self.on_end()

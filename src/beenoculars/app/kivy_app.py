@@ -2,8 +2,8 @@ import logging
 import os
 
 import kivy
-from kivy.lang import Builder
-from kivy.logger import Logger
+from kivy.lang import Builder  # type: ignore
+from kivy.logger import Logger  # type: ignore
 
 import beenoculars.image_processing as imp
 from beenoculars.app.kivy_bindings import init_event_bindings
@@ -14,7 +14,7 @@ from beenoculars.kivy.image_processing import ToCVImageProcess, ToKivyImageProce
 
 logging.root = Logger
 
-kivy.require('1.8.0')
+kivy.require('1.8.0')  # type: ignore
 
 # logger
 log = logging.getLogger(__name__)

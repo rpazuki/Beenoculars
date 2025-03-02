@@ -1,12 +1,12 @@
 import logging
 
 import cv2 as cv
-from kivy.graphics.texture import Texture
+from kivy.graphics.texture import Texture  # type: ignore
 from numpy import asarray, ndarray
 from PIL import Image as PILImage
 
 from beenoculars.core import safe_call
-from beenoculars.image_processing import Process
+from beenoculars.image_processing import Dict, Process
 
 # logger
 log = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def to_texture(frame, flip_x=False, flip_y=False):
 
 class ToCVImageProcess(Process):
     @safe_call(log)
-    def __call__(self, image: Texture, /, **kwargs) -> ndarray:
+    def __call__(self, image: Texture, **kwargs) -> Dict:
         """Converts a given toga Image to a numpy array (opencv) Image.
 
         Parameters
@@ -66,11 +66,15 @@ class ToCVImageProcess(Process):
         # image = PILImage.open(io.BytesIO(image.pixels))
         image = asarray(image)
         image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
-        return image
+        return Dict(image=image)
 
 
 class ToKivyImageProcess(Process):
-    def __call__(self, image: ndarray, /, flip_x=False, flip_y=False, **kwargs) -> Texture:
+    def __call__(self,
+                 image: ndarray,
+                 flip_x=False,
+                 flip_y=False,
+                 **kwargs) -> Dict:
         """Converts a given numpy array (opencv) to a toga Image.
 
         Parameters
@@ -88,4 +92,4 @@ class ToKivyImageProcess(Process):
             The resulting kivy Image.
         """
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        return to_texture(image, flip_x, flip_y)
+        return Dict(image=to_texture(image, flip_x, flip_y))

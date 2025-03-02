@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-from typing import Any, Mapping
+from typing import Any, Callable, Coroutine, Mapping
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ class EventType(Enum):
     ON_TOUCH_UP = 5
     BIND = 100
 
+    @staticmethod
     def get_all_eventTypes():
         return vars(EventType)['_member_names_']
 
@@ -46,8 +47,8 @@ class Event:
                  id: str,
                  eventType: EventType,
                  service: ServiceStrategy,
-                 property_name: str = None,
-                 extra_kwargs: Mapping = None
+                 property_name: str = "",
+                 extra_kwargs: Mapping = {}
                  ) -> None:
         self.id = id
         self.eventType = eventType
@@ -157,6 +158,63 @@ class AbstractApp(ABC):
         recursive(root)
 
 
+class AbstractEventDispatcher(ABC):
+
+    #
+    @abstractmethod
+    def register(self, event_name: str, handler) -> None:
+        pass
+
+    @abstractmethod
+    def register_framework(self, event_name: str, handler) -> None:
+        pass
+
+    @abstractmethod
+    def register_async(self, event_name: str, async_handler) -> None:
+        pass
+
+    @abstractmethod
+    def register_async_framework(self, event_name: str, async_handler) -> None:
+        pass
+    #
+
+    @abstractmethod
+    def dispatch(self,
+                 event_name: str,
+                 widget: Any,
+                 app: AbstractApp,
+                 extrakwargs: Mapping,
+                 *args,
+                 **kwargs) -> None:
+        pass
+
+    @abstractmethod
+    async def dispatch_async(self,
+                             event_name: str,
+                             widget: Any,
+                             app: AbstractApp,
+                             extrakwargs: Mapping,
+                             *args,
+                             **kwargs) -> None:
+        pass
+
+    @abstractmethod
+    def service_callback(self,
+                         id: str,
+                         widget: Any,
+                         app: AbstractApp,
+                         extrakwargs: Mapping) -> Callable[..., None]:
+        pass
+
+    @abstractmethod
+    def service_async_callback(self,
+                               id: str,
+                               widget: Any,
+                               app: AbstractApp,
+                               extrakwargs: Mapping) -> Callable[..., Coroutine[Any, Any, None]]:
+        pass
+
+
 class ServiceRegistry(object):
     """A singleton object that store the required (id: ServiceStrategy).
     """
@@ -170,25 +228,26 @@ class ServiceRegistry(object):
         return cls._instance
 
     __events = {}
+    _dispatcher: AbstractEventDispatcher
     _ui_framework = UIFramework.TOGA
 
     @property
     def ui_framework(self) -> UIFramework:
-        return self._instance._ui_framework
+        return self._ui_framework
 
     @ui_framework.setter
     def ui_framework(self, value: UIFramework):
-        self._instance._ui_framework = value
+        self._ui_framework = value
 
     @property
     def dispatcher(self):
-        return self._instance._dispatcher
+        return self._dispatcher
 
     @property
     def events(self):
-        return self._instance.__events
+        return self.__events
 
-    def bind_event(self, event: Event):
+    def bind_event(self, event: Event) -> None:
         self.events[event.id] = event
 
     def get_event_info(self, id) -> Event:
@@ -211,7 +270,7 @@ class ServiceRegistry(object):
         app : AbstractApp
             The app object.
         """
-        if event.extra_kwargs is not None and not isinstance(event.extra_kwargs, Mapping):
+        if event.extra_kwargs is not {} and not isinstance(event.extra_kwargs, Mapping):
             raise ValueError(
                 f" Widget id:'{event.id}' ({type(element).__name__}) "
                 f"asked for {event.eventType.name} handler, but did not provide "
@@ -291,7 +350,7 @@ class ServiceRegistry(object):
             eventInfo.service.on_exit()
 
 
-class EventDispatcher:
+class EventDispatcher(AbstractEventDispatcher):
     """Event dispatcher that binds the UI elements call back to EventStrategy instances.
 
     This is a lightweight event dispatcher that can support both sync and async calls.

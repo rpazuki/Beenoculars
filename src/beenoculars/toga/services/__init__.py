@@ -1,1 +1,1 @@
-from .images import TogaOverlayContours
+from .images import TogaOverlayContours  # noqa

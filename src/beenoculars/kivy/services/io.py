@@ -3,13 +3,13 @@ import os
 from time import sleep
 from typing import Any
 
-from kivy.factory import Factory
-from kivy.lang import Builder
+from kivy.factory import Factory  # type: ignore
+from kivy.lang import Builder  # type: ignore
 
 # import toga
-from kivy.properties import ObjectProperty
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.popup import Popup
+from kivy.properties import ObjectProperty  # type: ignore
+from kivy.uix.floatlayout import FloatLayout  # type: ignore
+from kivy.uix.popup import Popup  # type: ignore
 
 import beenoculars.core as core
 from beenoculars.core import safe_call
@@ -65,8 +65,9 @@ class FileOpenOpenCV(core.SyncServiceStrategy):
         if len(filename) > 0:
             import cv2 as cv
             frame = cv.imread(filename[0])
-            image = self.toKivyImage(frame, flip_x=True, flip_y=False)
-            self.app.original_image = image
+            kivy_image = self.toKivyImage(
+                image=frame, flip_x=True, flip_y=False)
+            self.app.original_image = kivy_image.image  # type: ignore
         self._popup.dismiss()
 
     @safe_call(log)
@@ -105,8 +106,9 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
             frame = CaptureThreadGlobals.frame
             counter += 1
         if frame is not None:
-            image = self.toKivyImage(frame, flip_x=True, flip_y=False)
-            app.original_image = image
+            kivy_image = self.toKivyImage(
+                image=frame, flip_x=True, flip_y=False)
+            app.original_image = kivy_image.image  # type: ignore
         else:
             log.error("CaptureByOpenCVThread: Cannot capture photo.")
 

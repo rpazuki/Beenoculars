@@ -7,6 +7,7 @@ from toga import Widget
 
 import beenoculars.core as core
 from beenoculars.core import safe_async_call, safe_call
+from beenoculars.image_processing import Dict
 from beenoculars.toga import LayoutApp
 from beenoculars.toga.image_processing import ToTogaImageProcess
 from beenoculars.toga.image_processing import ToTogaImageProcess as ToTogaImage
@@ -20,15 +21,15 @@ class FileOpenOpenCV(core.AsyncServiceStrategy):
         self.toTogaImage = ToTogaImageProcess()
 
     @safe_async_call(log)
-    async def handle_event(self, widget: Any, app: core.AbstractApp, *args, **kwargs):
+    async def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
         import cv2
         fname = await widget.app.dialog(toga.OpenFileDialog("Open file with Toga"))
         if fname is None:
             return  # No file selected
         # Load and convert the image to a texture
         frame = cv2.imread(str(fname))
-        image = self.toTogaImage(frame)
-        app.original_image = image
+        toga_image: Dict = self.toTogaImage(image=frame)
+        app.original_image = toga_image.image
         return
 
 
@@ -63,7 +64,7 @@ class CaptureByOpenCV(core.SyncServiceStrategy):
         return self.__capture
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: core.AbstractApp, *args, **kwargs):
+    def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
         success, frame = self.capture.read()
         counter = 0
         while not success and counter < 20:
@@ -71,8 +72,8 @@ class CaptureByOpenCV(core.SyncServiceStrategy):
             success, frame = self.capture.read()
             counter += 1
         if success:
-            image = self.toTogaImage(frame)
-            app.original_image = image
+            toga_image: Dict = self.toTogaImage(image=frame)
+            app.original_image = toga_image.image
         else:
             log.error("CaptureByOpenCV: Cannot capture photo.")
 
@@ -94,7 +95,7 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
         self.__thread.start()
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: core.AbstractApp, *args, **kwargs):
+    def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
         from beenoculars.camera_thread import CaptureThreadGlobals
 
         frame = CaptureThreadGlobals.frame
@@ -104,8 +105,8 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
             frame = CaptureThreadGlobals.frame
             counter += 1
         if frame is not None:
-            image = self.toTogaImage(frame)
-            app.original_image = image
+            toga_image: Dict = self.toTogaImage(image=frame)
+            app.original_image = toga_image.image
         else:
             log.error("CaptureByOpenCVThread: Cannot capture photo.")
 
