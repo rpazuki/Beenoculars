@@ -3,7 +3,7 @@ Studying bees diseases by analysing photos
 """
 import logging
 
-from beenoculars.core.__core__ import ServiceRegistry
+from beenoculars.core import ServiceRegistry, UIFramework
 from beenoculars.toga.py_interpreter import InterpreterLayoutApp, TwoColumnsLayout
 
 # logger
@@ -20,7 +20,7 @@ class Interpreter(InterpreterLayoutApp):
 
 def create_app():
     log.info("Interpreter app stars")
-    ServiceRegistry().is_toga = True
+    ServiceRegistry().ui_framework = UIFramework.TOGA
     app = Interpreter("Beenoculars")
     #
     return app

@@ -1,1 +1,1 @@
-from .processes import ToCVImageProcess, ToKivyImageProcess
+from .processes import ToCVImageProcess, ToKivyImageProcess  # noqa

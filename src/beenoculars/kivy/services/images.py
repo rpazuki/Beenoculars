@@ -15,5 +15,5 @@ class KivyOverlayContours(OverlayContoursService):
     def _set_image(self, app, image):
         app.layout.picture.image.texture = image
 
-    def _contour_callback(self, widget, app, contours, hierarchy, areas, masks):
+    def _contour_callback(self, widget, app, contours, areas, masks):
         app.layout.ids.lb_count.text = f"Count:{int(np.sum(masks)):2d}"

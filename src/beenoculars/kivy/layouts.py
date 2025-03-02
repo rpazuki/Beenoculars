@@ -1,9 +1,9 @@
 
 import logging
 
-from kivy.app import App  # as kivyApp
-from kivy.core.window import Window
-from kivy.uix.boxlayout import BoxLayout
+from kivy.app import App  # type: ignore # as kivyApp
+from kivy.core.window import Window  # type: ignore
+from kivy.uix.boxlayout import BoxLayout  # type: ignore
 
 import beenoculars.core as core
 from beenoculars.core import AbstractApp, AbstractLayout
@@ -26,6 +26,8 @@ class Layout(AbstractLayout):
 
     @property
     def main_box(self):
+        if self._main_box is None:
+            raise ValueError("Main box has not been initialized.")
         return self._main_box
 
     @property
@@ -153,6 +155,7 @@ class KivyLayoutApp(AbstractApp, App):
         super(KivyLayoutApp, self).__init__(
             layout=layout,
             **kwargs)
+        self.layout = layout
         self._original_image = None
 
     @property

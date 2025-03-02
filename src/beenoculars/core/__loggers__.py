@@ -3,7 +3,7 @@ import os
 
 is_not_kivy = True
 try:
-    from kivy.logger import Logger
+    from kivy.logger import Logger  # type: ignore
     logging.root = Logger
     is_not_kivy = False
 except ImportError:

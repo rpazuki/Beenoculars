@@ -1,1 +1,1 @@
-from .processes import ToCVImageProcess, ToTogaImageProcess
+from .processes import ToCVImageProcess, ToTogaImageProcess  # noqa

@@ -1,1 +1,1 @@
-from .layouts import KivyLayoutApp, Layout
+from .layouts import KivyLayoutApp, Layout  # noqa

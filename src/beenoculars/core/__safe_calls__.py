@@ -53,7 +53,7 @@ def safe_call(log, exceptions={}):
                     log.error(f"{exceptions[type(e)]}")
                 else:
                     log.error(
-                        f" {e}{__chain_traceback(e.__traceback__)}\n")
+                        f"\n{type(e).__name__}:{e}\n{__chain_traceback(e.__traceback__)}\n")
         return caller
     return try_call
 
@@ -78,6 +78,6 @@ def safe_async_call(log, exceptions={}):
                     log.error(f"{exceptions[type(e)]}")
                 else:
                     log.error(
-                        f" {e}{__chain_traceback(e.__traceback__)}\n")
+                        f"\n{type(e).__name__}:{e}\n{__chain_traceback(e.__traceback__)}\n")
         return caller
     return try_call
