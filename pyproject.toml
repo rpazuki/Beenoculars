@@ -23,6 +23,7 @@ test_sources = [
 requires = [
    "opencv_python==4.10.0.84",
    "pillow",
+   "addict",
 ]
 test_requires = [
     "pytest",

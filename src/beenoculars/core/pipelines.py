@@ -1,17 +1,10 @@
-import functools
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, TypeVar
 
-from addict import Dict as DefaultDict
-from typing_extensions import Self
+from beenoculars.config import Dict
 
-
-class Dict(DefaultDict):
-    def __missing__(self, key):
-        # raise KeyError(key)
-        # calling dict.unassinged properties return None
-        return None
+_Self = TypeVar('_Self', bound='AbstractPipeline')
 
 
 # logger
@@ -31,8 +24,8 @@ class AbstractPipeline(ABC):
     def __init__(self, processes=[]):
         self.processes = processes
 
-    def append_command(self, step) -> None:
-        self.processes.append(step)
+    def append_process(self, process) -> None:
+        self.processes.append(process)
 
     def __call__(self, /, **kwargs) -> Dict:
         return self.process(**kwargs)
@@ -42,7 +35,7 @@ class AbstractPipeline(ABC):
         pass
 
     @abstractmethod
-    def __rshift__(self, other) -> Self:
+    def __rshift__(self: _Self, other) -> _Self:
         pass
 
     @abstractmethod
@@ -263,7 +256,7 @@ class ProcessFork(AbstractProcess):
             return ProcessJoined(self, kwargs_mapping=other)
         else:
             raise ValueError(
-                f"The {type(other) =} must be a Mapping[str, int] ")
+                f"The {type(other)=} must be a Mapping[str, int] ")
 
 
 class ImageProcessingPipeline(AbstractPipeline):
@@ -342,7 +335,7 @@ class ImageProcessingPipeline(AbstractPipeline):
             return ProcessFork([self] * other)
         if isinstance(other, ProcessFork):
             raise ValueError(
-                f"The {type(other) =} cannot be mutiplied from LHS of a ImageProcessingPipeline."
+                f"The {type(other)=} cannot be mutiplied from LHS of a ImageProcessingPipeline."
             )
         if issubclass(type(other), AbstractProcess):
             return ProcessFork([self, other])
@@ -350,7 +343,7 @@ class ImageProcessingPipeline(AbstractPipeline):
             return ProcessFork([self, other])
         else:
             raise ValueError(
-                f"The {type(other) =} must be an int, a Process, ImageProcessingPipeline "
+                f"The {type(other)=} must be an int, a Process, ImageProcessingPipeline "
                 f"or tuples of both.")
 
     def process(self, /, **kwargs) -> Dict:
@@ -405,44 +398,6 @@ class ProcessLogic(AbstractProcess):
         return self.logic_callback(**kwargs)
 
 
-def processLogic(func: Callable[..., Dict]) -> Callable[..., ProcessLogic]:
-    """A decorator for creating inline process.
-
-       It can turn a function to a process, as long as the function
-       arguments include '**kwargs' and returns a Dict as it payloads.
-       In short, decorating a function can turn it into an inline definition
-       of a process, which can be joined (>>) or forked (*) by other processes.
-
-       Example:
-           @processLogic
-           def proc2(condition:bool, **kwargs) -> Dict:
-               if condition:
-                   return Dict(value=True)
-               else:
-                   return Dict(value=False)
-
-            proc1 >> proc2()
-
-    Parameters
-    ----------
-    func : Callable[..., Dict]
-        Callable function that contains the logic of creating the process.
-        The Callable function must include '**kwargs' in its arguments and
-        returns a Dict as it payloads.
-
-    Returns
-    -------
-    Callable[..., ProcessLogic]
-        The decorated process. By calling it without any argument,
-        it returns a process that can be joined or forked to others.
-    """
-    p_logic = ProcessLogic(func)
-
-    def logic() -> ProcessLogic:
-        return p_logic
-    return logic
-
-
 class ProcessLogicProperty(AbstractProcess):
     def __init__(self, logic_callback: Callable[..., Dict]):
         self.logic_callback = logic_callback
@@ -450,48 +405,6 @@ class ProcessLogicProperty(AbstractProcess):
 
     def __call__(self, **kwargs) -> Dict:
         return self.logic_callback(self.caller_class, **kwargs)
-
-
-def processLogicProperty(func: Callable[..., Dict]) -> property:
-    """A decorator for creating inline process inside classes as a property.
-
-       It can turn a class method to a process as a property, as long as the method
-       arguments includes '**kwargs' and returns a Dict as it payloads.
-       In short, decorating a class method turns it into an inline definition
-       of a process, which can be joined (>>) or forked (*) by other processes.
-
-       Example:
-           class ClassExample:
-               @processLogicProperty
-               def proc2(self, condition:bool, **kwargs) -> Dict:
-                   if condition:
-                       return Dict(value=True)
-                   else:
-                       return Dict(value=False)
-                def another _function(self):
-                    pipline = proc1 >> self.proc2
-
-    Parameters
-    ----------
-    func : Callable[..., Dict]
-        A method that defined in a class that contains the logic of creating
-        the process. The Callable method must have '**kwargs' in its arguments
-        (including the default 'self' argument) and returns a Dict as it payloads.
-
-    Returns
-    -------
-    Callable[..., ProcessLogic]
-        The decorated process. By using it like a property,
-        it returns a process that can be joined or forked to others.
-    """
-    p_logic = ProcessLogicProperty(func)
-
-    def logic(caller) -> ProcessLogicProperty:
-        p_logic.caller_class = caller
-        return p_logic
-    # Turns the return to a property with a getter method
-    logic_property = property(fget=logic)
-    return logic_property
 
 
 class ProcessFactory:
@@ -505,34 +418,3 @@ class ProcessFactory:
         """Create a parametrised process (arguments) to be attached and called later."""
         process = self.factory_callback(*args, **kwargs)
         return process
-
-
-def processFactory(cache: bool,
-                   cache_size: int = 256):
-    """A factory decorator that turns a function to a process.
-
-       The function must return a process or ImageProcessingPipeline.
-
-    Parameters
-    ----------
-    cache : bool
-        Cache the created pipeline based on the arguments that pass to
-        the factory function.
-    cache_size : int, optional
-        The size of the cache, by default 256
-    """
-    def decorator(func):
-        p_factory = ProcessFactory(func)
-
-        if cache:
-            @functools.lru_cache(cache_size)
-            def cached_factory(*args, **kwargs) -> AbstractProcess:
-                """Parametrisation arguments are passed here."""
-                return p_factory.create(*args, **kwargs)
-            return cached_factory
-        else:
-            def factory(*args, **kwargs) -> AbstractProcess:
-                """Parametrisation arguments are passed here."""
-                return p_factory.create(*args, **kwargs)
-            return factory
-    return decorator

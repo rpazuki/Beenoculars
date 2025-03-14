@@ -5,8 +5,8 @@ from kivy.graphics.texture import Texture  # type: ignore
 from numpy import asarray, ndarray
 from PIL import Image as PILImage
 
-from beenoculars.core import safe_call
-from beenoculars.image_processing import Dict, Process
+from beenoculars.config import Dict
+from beenoculars.core import Process, safe_call
 
 # logger
 log = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def to_texture(frame, flip_x=False, flip_y=False):
     return image_texture
 
 
-class ToCVImageProcess(Process):
+class ToOpenCVImageProcess(Process):
     @safe_call(log)
     def __call__(self, image: Texture, **kwargs) -> Dict:
         """Converts a given toga Image to a numpy array (opencv) Image.
@@ -64,7 +64,7 @@ class ToCVImageProcess(Process):
                                    image.pixels)
 
         # image = PILImage.open(io.BytesIO(image.pixels))
-        image = asarray(image)
+        image = asarray(image, dtype='uint8')
         image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
         return Dict(image=image)
 

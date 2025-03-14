@@ -1,12 +1,15 @@
 
 import beenoculars.image_processing as imp
-from beenoculars.image_processing import (
+from beenoculars.core import (
     ImageProcessingPipeline,
     Process,
+    ProcessesRegistry,
+    ToFrameworkImage,
+    ToOpenCVImage,
     processFactory,
 )
 
-registry = imp.ProcessesRegistry()
+registry = ProcessesRegistry()
 
 
 ###########################################################
@@ -18,7 +21,7 @@ registry = imp.ProcessesRegistry()
 #      toOpenCV >> ---------------------
 #
 def triple_choice_background(is_gray: bool, is_bw: bool) -> ImageProcessingPipeline:
-    toOpenCV = registry[imp.ToOpenCVImageProcess]
+    toOpenCV = registry[ToOpenCVImage]
     if is_gray:
         pipeline = toOpenCV >> imp.ToGray >> imp.ToColor
     elif is_bw:
@@ -51,7 +54,7 @@ def overlay_pipeline(has_contour: bool,
     ImageProcessingPipeline
         An image processing pipeline.
     """
-    toFramework = registry[imp.ToFrameworkImageProcess]
+    toFramework = registry[ToFrameworkImage]
     if not has_contour:
         return toFramework
 

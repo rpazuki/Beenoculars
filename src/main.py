@@ -3,7 +3,7 @@ import os
 
 from kivy.lang import Builder  # type: ignore
 
-from beenoculars.app.kivy_app import create_app as create_kivy_app
+from beenoculars.kivy.app import create_app as create_kivy_app
 
 # logger
 log = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 import logging
 import os
 from time import sleep
-from typing import Any
+from typing import Any, Callable
 
 from kivy.factory import Factory  # type: ignore
 from kivy.lang import Builder  # type: ignore
@@ -12,14 +12,9 @@ from kivy.uix.floatlayout import FloatLayout  # type: ignore
 from kivy.uix.popup import Popup  # type: ignore
 
 import beenoculars.core as core
+from beenoculars.config import Dict
 from beenoculars.core import safe_call
-
-# from beenoculars.toga import LayoutApp
-# from beenoculars.toga.image_processing import ToTogaImageProcess
-from beenoculars.kivy.image_processing import ToKivyImageProcess as ToKivyImage
-
-# from plyer import filechooser
-
+from beenoculars.kivy.image_processing import ToKivyImage
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +47,7 @@ Builder.load_string('''
                     ''')
 
 
-class FileOpenOpenCV(core.SyncServiceStrategy):
+class FileOpenOpenCV(core.SyncService):
     def __init__(self) -> None:
         super().__init__()
         self.app = None
@@ -61,28 +56,36 @@ class FileOpenOpenCV(core.SyncServiceStrategy):
     def dismiss_popup(self):
         self._popup.dismiss()
 
+    @safe_call(log)
     def load(self, path, filename):
         if len(filename) > 0:
             import cv2 as cv
             frame = cv.imread(filename[0])
-            kivy_image = self.toKivyImage(
+            kivy_image: Dict = self.toKivyImage(
                 image=frame, flip_x=True, flip_y=False)
-            self.app.original_image = kivy_image.image  # type: ignore
+            if self.service_callback is not None:
+                self.service_callback(kivy_image)
         self._popup.dismiss()
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: core.AbstractApp, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app: core.AbstractApp,
+                     service_callback: Callable | None = None,
+                     *args,
+                     **kwargs):
 
         self.app = app
         content = LoadDialog(load=self.load, cancel=self.dismiss_popup)
         content.ids['filechooser'].path = os.getcwd()
         self._popup = Popup(title="Load file", content=content,
                             size_hint=(0.9, 0.9))
+        self.service_callback = service_callback
         self._popup.open()
         return
 
 
-class CaptureByOpenCVThread(core.SyncServiceStrategy):
+class CaptureByOpenCVThread(core.SyncService):
     @safe_call(log)
     def __init__(self):
         super().__init__()
@@ -95,7 +98,12 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
         self.__thread.start()
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: core.AbstractApp, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app: core.AbstractApp,
+                     service_callback: Callable | None = None,
+                     *args,
+                     **kwargs):
 
         from beenoculars.camera_thread import CaptureThreadGlobals
 
@@ -106,9 +114,10 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
             frame = CaptureThreadGlobals.frame
             counter += 1
         if frame is not None:
-            kivy_image = self.toKivyImage(
+            kivy_image: Dict = self.toKivyImage(
                 image=frame, flip_x=True, flip_y=False)
-            app.original_image = kivy_image.image  # type: ignore
+            if service_callback is not None:
+                service_callback(kivy_image)
         else:
             log.error("CaptureByOpenCVThread: Cannot capture photo.")
 

@@ -1,6 +1,7 @@
 import pytest
 
-from beenoculars.image_processing.pipelines import (
+from beenoculars.core import processFactory, processLogic, processLogicProperty
+from beenoculars.core.pipelines import (
     AbstractProcess,
     Dict,
     ImageProcessingPipeline,
@@ -10,9 +11,6 @@ from beenoculars.image_processing.pipelines import (
     ProcessLogic,
     ProcessLogicProperty,
     ProcessPassThrough,
-    processFactory,
-    processLogic,
-    processLogicProperty,
 )
 
 # filepath: beenoculars/src/beenoculars/image_processing/test_pipelines.py

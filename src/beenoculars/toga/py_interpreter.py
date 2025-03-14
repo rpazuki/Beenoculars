@@ -11,8 +11,8 @@ log = logging.getLogger(__name__)
 
 
 class InterpreterLayout(AbstractLayout):
-    def __init__(self):
-        super(InterpreterLayout, self).__init__()
+    def __init__(self, app):
+        super(InterpreterLayout, self).__init__(app)
         self._main_box = None
 
     @property

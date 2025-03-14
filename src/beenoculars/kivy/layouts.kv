@@ -1,8 +1,8 @@
 #:kivy 1.0.9
 #:import win kivy.core.window
-<BoxLayoutApp>:
-    orientation: 'vertical'
-    on_size: root.picture.reset_image_position_and_size()
+<ImageInputComponent>
+    size_hint: 1, None
+    height : '32dp'
     BoxLayout:
         orientation: 'horizontal'
         padding: 5
@@ -10,13 +10,6 @@
         size_hint: 1, None
         height: '30dp'
         pos_hint: {'top': 1}
-        # border: 4, 4, 4, 4
-        # canvas.before:
-        #     Color:
-        #         rgba: .5, .0, .0, 1
-        #     Line:
-        #         width: 2
-        #         rectangle: self.x, self.y, self.width, self.height
         Button:
             text: 'Open'
             id: file_open_cv
@@ -36,56 +29,20 @@
             pos_hint: {'top': 1.}
             height: '30dp'
             # on_release: root.load_image_from_camera_cv()
-        Label:
-            text: 'Grey'
+        Button:
+            text: 'Log'
+            id: show_log
             size_hint_y: None
             padding: 5
             spacing: 5
             pos_hint: {'top': 1.}
             height: '30dp'
-        Switch:
-            id: change_grey
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
-        Label:
-            text: 'B&W'
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
-        Switch:
-            id: change_black_white
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
-        Label:
-            text: 'Contours'
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
-        Switch:
-            id: draw_contours
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
-        Label:
-            text: 'Count:??'
-            id: lb_count
-            size_hint_y: None
-            padding: 5
-            spacing: 5
-            pos_hint: {'top': 1.}
-            height: '30dp'
+            on_release: root.show_log()
+
+<OverlayComponent>
+    orientation: 'vertical'
+    size_hint: 1, None
+    height : '90dp'
     BoxLayout:
         orientation: 'horizontal'
         padding: 5
@@ -93,6 +50,55 @@
         size_hint: 1, None
         height: '30dp'
         pos_hint: {'top': 1}
+        Label:
+            text: 'Grey'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Switch:
+            id: change_grey
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Label:
+            text: 'B&W'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Switch:
+            id: change_black_white
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Label:
+            text: 'Contours'
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Switch:
+            id: draw_contours
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+        Label:
+            text: 'Count:??'
+            id: lb_count
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+    BoxLayout:
+        orientation: 'horizontal'
+        padding: 5
+        spacing: 5
+        size_hint: 1, None
+        height: '50dp'
         border: 4, 4, 4, 4
         Label:
             text: 'Thickness'
@@ -100,7 +106,6 @@
             size_hint_y: None
             padding: 5
             spacing: 5
-            pos_hint: {'top': 1.}
             height: '30dp'
             width: '10dp'
         Spinner:
@@ -111,7 +116,6 @@
             values: '1', '2', '3', '4', '5'
             padding: 5
             spacing: 5
-            pos_hint: {'top': 1.}
             height: '30dp'
             width: '20dp'
 
@@ -121,7 +125,6 @@
             size_hint_y: None
             padding: 5
             spacing: 5
-            pos_hint: {'top': 1.}
             height: '30dp'
         Slider:
             id: change_overlay_threshold
@@ -134,7 +137,6 @@
             size_hint_y: None
             padding: 5
             spacing: 5
-            pos_hint: {'top': 1.}
             height: '30dp'
         Label:
             text: 'Percentage:90-100'
@@ -142,7 +144,6 @@
             size_hint_y: None
             padding: 5
             spacing: 5
-            pos_hint: {'top': 1.}
             height: '30dp'
         BoxLayout:
             orientation: 'vertical'
@@ -150,7 +151,6 @@
             spacing: 1
             size_hint: 1, None
             height: '60dp'
-            pos_hint: {'top': 1}
             border: 4, 4, 4, 4
             Slider:
                 id: change_overlay_percentage_1
@@ -163,7 +163,6 @@
                 size_hint_y: None
                 padding: 5
                 spacing: 5
-                pos_hint: {'top': 1.}
                 height: '25dp'
             Slider:
                 id: change_overlay_percentage_2
@@ -176,21 +175,24 @@
                 size_hint_y: None
                 padding: 5
                 spacing: 5
-                pos_hint: {'top': 1.}
                 height: '25dp'
-<PictureLayout>:
+
+<ImageViewComponent>
+    size_hint: 1, 1
+    on_size: root.reset_image_position_and_size()
     Scatter:
         # on_size: self.center =  win.Window.center
         # center: self.parent.center
         # size: image.size
         # size: 400, 400 / image.image_ratio
-        size_hint: None, None
+        size_hint: 1, None
         do_rotation: False
         do_scale: False
         do_translation: True
         Image:
             id: image
             # size: 400, 400 / self.image_ratio
+            size_hint: 1, None
             source: 'data/logo/kivy-icon-24.png'
             canvas.before:
                 Color:
@@ -198,3 +200,38 @@
                 Line:
                     width: 2
                     rectangle: self.x, self.y, self.width, self.height
+
+<LogViewBox>:
+    orientation: 'vertical'
+    on_size: root.on_size(*args)
+    BoxLayout:
+        orientation: 'horizontal'
+        padding: 5
+        spacing: 5
+        size_hint: 1, None
+        height: '32dp'
+        Button:
+            text: 'Return'
+            id: return_to_main
+            size_hint_y: None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+            size_hint: .5, None
+            on_release: root.show_main()
+        Button:
+            text: 'Clear'
+            id: clear_log
+            size_hint: .5, None
+            padding: 5
+            spacing: 5
+            height: '30dp'
+            on_release: root.clear_log()
+
+    TextInput:
+        padding: 5
+        spacing: 5
+        multiline: True
+        id: output_textbox
+        text: ""
+        pos_hint: {'top': 1}

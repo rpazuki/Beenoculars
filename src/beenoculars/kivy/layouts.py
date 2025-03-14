@@ -1,54 +1,119 @@
 
 import logging
 
-from kivy.app import App  # type: ignore # as kivyApp
+import numpy as np
 from kivy.core.window import Window  # type: ignore
-from kivy.uix.boxlayout import BoxLayout  # type: ignore
 
 import beenoculars.core as core
-from beenoculars.core import AbstractApp, AbstractLayout
+from beenoculars.config import Config
+from beenoculars.core import Event, EventType, ServiceRegistry
+from beenoculars.kivy import (
+    KivyBox,
+    KivyComponent,
+    KivyLayout,
+    KivyMultiLayoutApp,
+    KivyStackedLayout,
+)
+from beenoculars.kivy.services.io import CaptureByOpenCVThread, FileOpenOpenCV
+from beenoculars.services import OverlayContoursService as OverlayContours
 
 # from pathlib import Path
 
 
 log = logging.getLogger(__name__)
 
-TOOLBAR_HEIGHT = 85
+TOOLBAR_HEIGHT = 125
 
 
 # Builder.load_file(str(Path("layout.kv").resolve()))
 
+class ImageInputComponent(KivyComponent):
 
-class Layout(AbstractLayout):
-    def __init__(self):
-        super(Layout, self).__init__()
-        self._main_box = None
+    def show_log(self):
+        self.ml_app.show_log()
+
+    def image_loaded(self, kivy_image):
+        self.parent_layout.image_loaded(kivy_image)         # type: ignore
+
+    def on_common_config(self):
+        registry = ServiceRegistry()
+        registry.bind_event(
+            Event("file_open_cv",
+                  EventType.ON_PRESS,
+                  FileOpenOpenCV(),
+                  service_callback=self.image_loaded))
+
+    def on_linux_config(self):
+        ServiceRegistry().bind_event(
+            Event("capture",
+                  EventType.ON_PRESS,
+                  CaptureByOpenCVThread(),
+                  service_callback=self.image_loaded))
+
+
+class ImageViewComponent(KivyComponent):
 
     @property
-    def main_box(self):
-        if self._main_box is None:
-            raise ValueError("Main box has not been initialized.")
-        return self._main_box
+    def image(self):
+        return self.ids.image
 
-    @property
-    def picture(self):
-        return self.main_box.picture
+    def set_image_size(self):
+        self.image_width, self.image_height = self.ids.image.texture_size[
+            0], self.ids.image.texture_size[1]
 
-    @property
-    def ids(self):
-        return self.main_box.ids
+    def reset_image_position_and_size(self):
+        window_width, window_height = Window.size[0], Window.size[1]
+        window_height -= TOOLBAR_HEIGHT  # subtract the height of the toolbar
+        image_width, image_height = self.image.texture.width, self.image.texture.height
 
-    def build_layout(self):
-        self._main_box = BoxLayoutApp()
-        return self._main_box
+        if image_width > window_width:
+            new_image_width, new_image_height = window_width, window_width / \
+                self.ids.image.image_ratio
+        elif image_height > window_height:
+            new_image_width, new_image_height = window_height * \
+                self.ids.image.image_ratio, window_height
+        else:
+            new_image_width, new_image_height = image_width, image_height
 
-    # def open(self):
-    #     path = filechooser.open_file(title="Pick an image file..",
-    #                                  # filters=[("Comma-separated Values", "*.csv")]
-    #                                  )
-    #     log.info(path)
-    #     if path and len(path) > 0:
-    #         self.load_image_from_path(path[0])
+        if new_image_height > window_height:
+            new_image_width, new_image_height = window_height * \
+                self.ids.image.image_ratio, window_height
+
+        self.ids.image.size = (new_image_width, new_image_height)
+        self.ids.image.center = (
+            Window.center[0], Window.center[1] - TOOLBAR_HEIGHT / 2)
+
+
+class OverlayComponent(KivyComponent):
+    def __init__(self, layout: KivyStackedLayout,  **kwargs):
+        super(OverlayComponent, self).__init__(layout, **kwargs)
+        self.flg_changing = False
+        self.ids.change_grey.bind(active=self.swt_gray_on_change)
+        self.ids.change_black_white.bind(
+            active=self.swt_black_white_on_change)
+        self.ids.change_overlay_threshold.bind(
+            value=self.threshold_label_change)
+        self.ids.change_overlay_percentage_1.bind(
+            value=self.percentage_label_change)
+        self.ids.change_overlay_percentage_2.bind(
+            value=self.percentage_label_change)
+
+    def threshold_label_change(self, widget, value):
+        self.ids.threshold_label.text = f"Threshold:{int(value)}"
+
+    def percentage_label_change(self, widget, value):
+        v1 = self.ids.change_overlay_percentage_1.value
+        v2 = self.ids.change_overlay_percentage_2.value
+        v1, v2 = min(v1, v2), max(v1, v2)
+        self.ids.percentage_label.text = f"Percentage:{v1:.1f}-{v2:.1f}"
+
+    def swt_gray_on_change(self, widget, value):
+        if value:
+            self.ids.change_black_white.active = False
+
+    def swt_black_white_on_change(self, widget, value):
+        if value:
+            self.ids.change_grey.active = False
 
     def is_gray(self):
         return self.ids.change_grey.active
@@ -76,114 +141,167 @@ class Layout(AbstractLayout):
         return core.int_(self.ids.number_thickness.text,
                          default=1)
 
+    def get_original_image(self):
+        return self.parent_layout.original_image  # type: ignore
 
-class BoxLayoutApp(BoxLayout):
-    def __init__(self, **kwargs):
-        super(BoxLayoutApp, self).__init__(**kwargs)
-        # setattr(self.ids["'Open'"], "id", "Open",)
-        for key in self.ids:
-            setattr(self.ids[key], "id", key)
-        self.flg_changing = False
-        self.ids.change_grey.bind(active=self.swt_gray_on_change)
-        self.ids.change_black_white.bind(
-            active=self.swt_black_white_on_change)
-        self.ids.change_overlay_threshold.bind(
-            value=self.threshold_label_change)
-        self.ids.change_overlay_percentage_1.bind(
-            value=self.percentage_label_change)
-        self.ids.change_overlay_percentage_2.bind(
-            value=self.percentage_label_change)
-        self.picture = PictureLayout()
-        self.add_widget(self.picture)
-        # o = self.ids['file_open_cv']
-        # o.on_press = self.test
+    def on_common_config(self):
+        ############
+        # Settings
+        settings = self.ml_app.settings
+        self.ids.change_grey.active = settings.OverlayComponent.is_gray
+        self.ids.change_black_white.active = settings.OverlayComponent.is_bw
+        self.ids.draw_contours.active = settings.OverlayComponent.has_contour
+        self.ids.change_overlay_threshold.value = settings.OverlayComponent.threshold
+        self.ids.change_overlay_percentage_1.value = settings.OverlayComponent.percentages[0]
+        self.ids.change_overlay_percentage_2.value = settings.OverlayComponent.percentages[1]
+        self.ids.number_thickness.text = str(
+            settings.OverlayComponent.contours_thickness)
+        #
 
-    def threshold_label_change(self, widget, value):
-        self.ids.threshold_label.text = f"Threshold:{int(value)}"
+        def _contour_callback(results):
+            self.parent_layout.picture.image.texture = results.image  # type: ignore
+            if results.masks is not None:
+                self.ids.lb_count.text = f"Count:{int(np.sum(results.masks)):2d}"
 
-    def percentage_label_change(self, widget, value):
-        v1 = self.ids.change_overlay_percentage_1.value
-        v2 = self.ids.change_overlay_percentage_2.value
-        v1, v2 = min(v1, v2), max(v1, v2)
-        self.ids.percentage_label.text = f"Percentage:{v1:.1f}-{v2:.1f}"
+        args_dict = {'input_image': self.get_original_image,
+                     'threshold': self.threshold,
+                     'percentages': self.percentages,
+                     'contours_thickness': self.contours_thickness,
+                     'is_gray': self.is_gray,
+                     'is_bw': self.is_bw,
+                     'has_contour': self.has_contour,
+                     }
+        registry = ServiceRegistry()
+        registry.bind_event(Event("change_overlay_threshold",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="value",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("change_overlay_percentage_1",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="value",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("change_overlay_percentage_2",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="value",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("number_thickness",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="text",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("change_grey",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="active",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("change_black_white",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="active",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
+        registry.bind_event(Event("draw_contours",
+                                  EventType.BIND,
+                                  OverlayContours(),
+                                  property_name="active",
+                                  service_callback=_contour_callback,
+                                  extra_kwargs=args_dict))
 
-    def swt_gray_on_change(self, widget, value):
-        if value:
-            self.ids.change_black_white.active = False
-
-    def swt_black_white_on_change(self, widget, value):
-        if value:
-            self.ids.change_grey.active = False
-
-
-class PictureLayout(BoxLayout):
-
-    # source = StringProperty(None)
-    def __init__(self, **kwargs):
-        super(PictureLayout, self).__init__(**kwargs)
-        self.image = self.ids.image  # self.children[0].children[0]
-        self.set_image_size()
-
-    def set_image_size(self):
-        self.image_width, self.image_height = self.image.texture_size[
-            0], self.image.texture_size[1]
-
-    def reset_image_position_and_size(self):
-        window_width, window_height = Window.size[0], Window.size[1]
-        window_height -= TOOLBAR_HEIGHT  # subtract the height of the toolbar
-        image_width, image_height = self.image_width, self.image_height
-
-        if image_width > window_width:
-            new_image_width, new_image_height = window_width, window_width / self.image.image_ratio
-        elif image_height > window_height:
-            new_image_width, new_image_height = window_height * \
-                self.image.image_ratio, window_height
-        else:
-            new_image_width, new_image_height = image_width, image_height
-
-        if new_image_height > window_height:
-            new_image_width, new_image_height = window_height * \
-                self.image.image_ratio, window_height
-
-        self.image.size = (new_image_width, new_image_height)
-        self.image.center = (
-            Window.center[0], Window.center[1] - TOOLBAR_HEIGHT / 2)
+    def on_end(self):
+        ############
+        # Settings
+        settings = self.ml_app.settings
+        settings.OverlayComponent.is_gray = self.ids.change_grey.active
+        settings.OverlayComponent.is_bw = self.ids.change_black_white.active
+        settings.OverlayComponent.has_contour = self.ids.draw_contours.active
+        settings.OverlayComponent.threshold = self.ids.change_overlay_threshold.value
+        settings.OverlayComponent.percentages = [self.ids.change_overlay_percentage_1.value,
+                                                 self.ids.change_overlay_percentage_2.value]
+        settings.OverlayComponent.contours_thickness = int(
+            self.ids.number_thickness.text)
 
 
-class KivyLayoutApp(AbstractApp, App):
-    def __init__(self, layout: Layout, **kwargs):
-        super(KivyLayoutApp, self).__init__(
-            layout=layout,
-            **kwargs)
-        self.layout = layout
+class TopToolbarLayout(KivyStackedLayout):
+    def __init__(self, app: KivyMultiLayoutApp):
+        super().__init__(app,
+                         ImageInputComponent,
+                         OverlayComponent,
+                         ImageViewComponent)
+
         self._original_image = None
 
     @property
     def original_image(self):
         if (self._original_image is None and
-            self.layout.picture is not None and
-                self.layout.picture.image is not None):
-            self._original_image = self.layout.picture.image.texture
+            self.picture is not None and
+                self.picture.image is not None):
+            self._original_image = self.picture.image.texture
         return self._original_image
 
     @original_image.setter
     def original_image(self, value):
         self._original_image = value
-        self.layout.picture.image.texture = value
-        self.layout.picture.set_image_size()
-        self.layout.picture.reset_image_position_and_size()
+        self.picture.image.texture = value
+        self[ImageViewComponent].set_image_size()
+        self[ImageViewComponent].reset_image_position_and_size()
+
+    @property
+    def picture(self):
+        if self[ImageViewComponent] is None:
+            raise ValueError("Main box has not been initialized.")
+        return self[ImageViewComponent]
+
+    def image_loaded(self, kivy_image):
+        self.original_image = kivy_image.image
+        registry = ServiceRegistry()
+        registry.fire_event("draw_contours",
+                            self.ml_app)
 
     def load_image_from_path(self, path):
-        self.layout.picture.image.source = path
-        self._original_image = self.layout.picture.image.texture
-        self.layout.picture.set_image_size()
-        self.layout.picture.reset_image_position_and_size()
+        self.picture.image.source = path
+        self._original_image = self.picture.image.texture
+        self[ImageViewComponent].set_image_size()
+        self[ImageViewComponent].reset_image_position_and_size()
 
-    def build(self):
-        # layout = BoxLayoutApp()
-        self.on_begin()
-        return self.layout.main_box
 
-    def on_stop(self):
-        self.on_end()
-        return super().on_stop()
+class LogViewLayout(KivyLayout):
+
+    def _build_box(self):
+        log.info("Log View init.")
+        return LogViewBox(self)
+
+    def show_main(self, widget):
+        self.ml_app.show_main()  # type: ignore
+
+    def on_load(self):
+        # Load the log
+        if Config.log.to_file:
+            log_path = self.ml_app.data_path / Config.log.file_name  # type: ignore
+            with open(log_path, 'r') as file:
+                log_text = file.read()
+                self.ids.output_textbox.text = log_text
+
+
+class LogViewBox(KivyBox):
+
+    def on_size(self, box, dt):
+        self.ids.output_textbox.size = (Window.size[0] - box.children[0].height,
+                                        Window.size[1])
+
+    def show_main(self):
+        self.ml_app.show_main()
+
+    def clear_log(self):
+        if Config.log.to_file:
+            log_path = self.ml_app.data_path / Config.log.file_name  # type: ignore
+            with open(log_path, 'w') as file:
+                file.write("")
+        self.ids.output_textbox.text = ""

@@ -3,17 +3,16 @@ from typing import Any
 
 import beenoculars.core as core
 import beenoculars.image_processing as imp
-from beenoculars.image_processing import Dict
+from beenoculars.config import Dict
+from beenoculars.core import ServiceCallback, processFactory, processLogicProperty
+from beenoculars.core.__image_services__ import SyncImageService
 from beenoculars.image_processing.edge_detections import triple_choice_background
-from beenoculars.image_processing.pipelines import processFactory, processLogicProperty
 
 log = logging.getLogger(__name__)
 
 
-class OverlayContoursService(imp.SyncImageService):
+class OverlayContoursService(SyncImageService):
 
-    def _contour_callback(self, widget, app, contours, areas, masks):
-        pass
     #########################################################
     # Define te pipelines logic
     #########################################################
@@ -58,16 +57,20 @@ class OverlayContoursService(imp.SyncImageService):
 
         return pipline
 
+    counter = 0
+
     @core.safe_call(log)
     def handle_event(self,
                      widget: Any,
                      app: core.AbstractApp,
-                     threshold: int,
-                     percentages,
-                     contours_thickness,
-                     is_gray,
-                     is_bw,
-                     has_contour,
+                     service_callback: ServiceCallback | None,
+                     input_image,
+                     threshold: int = 127,
+                     percentages=(40, 100),
+                     contours_thickness=5,
+                     is_gray=False,
+                     is_bw=False,
+                     has_contour=False,
                      *args,
                      **kwargs):
         #########################################################
@@ -78,8 +81,6 @@ class OverlayContoursService(imp.SyncImageService):
                                        has_contour=has_contour)
         #########################################################
         # Run the pipeline
-        #########################################################
-        input_image = self._get_original_image(app)
         #########################################################
         # If there is no image, do nothing
         if input_image is None:
@@ -96,13 +97,6 @@ class OverlayContoursService(imp.SyncImageService):
         # Run the pipeline
         results = pipeline(**init_params)
         #########################################################
-        # Set the image
-        self._set_image(app, results.image)
-        #########################################################
         # If the contours are searched, call the callback
-        if results.contours is not None:
-            self._contour_callback(widget,
-                                   app,
-                                   results.contours,
-                                   results.areas,
-                                   results.masks)
+        if service_callback is not None:
+            service_callback(results)

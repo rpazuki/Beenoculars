@@ -6,10 +6,11 @@ import toga
 from numpy import asarray, ndarray
 from PIL import Image as PILImage
 
-from beenoculars.image_processing import Dict, Process
+from beenoculars.config import Dict
+from beenoculars.core import Process
 
 
-class ToCVImageProcess(Process):
+class ToOpenCVImageProcess(Process):
     def __call__(self, *, image: toga.Image, **kwargs) -> Dict:
         """Converts a given toga Image to a numpy array (opencv) Image.
 
@@ -24,7 +25,7 @@ class ToCVImageProcess(Process):
             The resulting toga numpy array (opencv) Image.
         """
         cv_image = PILImage.open(io.BytesIO(image.data))
-        cv_image = asarray(cv_image)
+        cv_image = asarray(cv_image, dtype='uint8')
         cv_image = cv.cvtColor(cv_image, cv.COLOR_RGB2BGR)
         return Dict(image=cv_image)
 

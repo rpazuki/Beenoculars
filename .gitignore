@@ -64,3 +64,9 @@ logs/
 # Environment
 .venv/
 .vscode/
+
+# Log files
+*/log.*
+
+# drawio
+**/.$*

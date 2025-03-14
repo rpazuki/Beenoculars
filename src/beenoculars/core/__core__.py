@@ -1,15 +1,66 @@
+"""The core module.
+
+   Notes:
+   ------
+
+    1- Service handler's arguments
+        Service's 'handle_event' arguments can be provided by
+        the caller on binding time. To do that, you must set the
+        Event's extra_kwargs : mapping[str, ServiceCallable | Any ].
+
+        Mapping's key is the name of the argument. Mapping's value can
+        be passed as Any, or can be a ServiceCallable type to be loaded
+        lazily: 'type  ServiceCallable = Callable[[None | object], Any]'
+
+        In other words, in the former case, the same value will send
+        to to service every time that the 'handle_event' is called,
+        and in the latter case, the Callable updates the value of
+        the argument each time the 'handle_event' is called.
+        The ServiceCallable signutare MUST have zero argument, or for class
+        function, the 'self' argument.
+
+        It can raise 'ServiceArgumentError'.
+
+    2- Service handler's arguments as callback
+        When the service argument is a callback, which will be called
+        later by the 'handle_event', it MUST be decorated by @service_callback.
+        It becomes clear, if we  consider that the arguments can be lazily
+        loaded, and so, it can be a Callable. As a result, on calling the
+        service's 'handle_event', it must be differentiated between Callable
+        as lazy load or callback.
+
+        It can raise 'ServiceArgumentError'.
+
+    3- Configurable
+       Both AbstractApp , AbstractLayout and TogaComponent
+       are 'Configurable'. So, they can impliment
+       os dependent configuration.
+
+       AbstractApp calls 'Configurable' once in its
+       lifcycle:  on_begin().
+
+       AbstractLayout calls 'Configurable' once on its
+       first load: on_load.
+"""
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-from typing import Any, Callable, Coroutine, Mapping
+from typing import Any, Callable, Mapping
+
+from beenoculars.config import Config, Configurable, Dict, GUIFramework, Settings
+from beenoculars.core.__loggers__ import file_out_log, std_out_log
 
 log = logging.getLogger(__name__)
 
 
-class UIFramework(Enum):
-    TOGA = 0
-    KIVY = 1
+class ServiceArgumentError(Exception):
+    def __init__(self, message: str, cause=None) -> None:
+        self.message = message
+        self.__cause__ = cause
+        super().__init__(self.message)
 
 
 class EventType(Enum):
@@ -26,58 +77,96 @@ class EventType(Enum):
         return vars(EventType)['_member_names_']
 
 
-class ServiceStrategy(ABC):
+class Service(ABC):
     """An abstract class for handeling UI event callbacks
     """
 
     @abstractmethod
-    def handle_event(self, widget: Any, app, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app,
+                     service_callback: Callable | None = None,
+                     *args,
+                     **kwargs) -> None:
         """An abstract class for handeling UI sync event callbacks
         """
         pass
 
-    def on_exit(self):
+    def on_exit(self) -> None:
         """The event handler that will be invoked when the app is about to exit.
         """
         pass
+
+
+# Accept zero or one argument
+type  ServiceCallback = Callable[[object | Dict], None]
 
 
 class Event:
     def __init__(self,
                  id: str,
                  eventType: EventType,
-                 service: ServiceStrategy,
+                 service: Service,
                  property_name: str = "",
-                 extra_kwargs: Mapping = {}
+                 extra_kwargs: Mapping[str, Any] = {},
+                 service_callback: ServiceCallback | None = None
                  ) -> None:
         self.id = id
         self.eventType = eventType
         self.service = service
         self.property_name = property_name
         self.extra_kwargs = extra_kwargs
+        self.service_callback = service_callback
 
     def element_event(self, element):
         return getattr(element, self.eventType.name.lower())
 
 
-class AbstractLayout(ABC):
-    def __init__(self) -> None:
+class AbstractLayout(ABC, Configurable):
+    def __init__(self, app: AbstractApp) -> None:
         super(AbstractLayout, self).__init__()
+        self._app = app
+
+    @property
+    def _name(self):
+        return type(self).__qualname__
 
     @abstractmethod
     def build_layout(self) -> Any:
         pass
 
+    @property
+    def ml_app(self) -> AbstractApp:
+        if self._app is None:
+            raise ValueError("app has not been initialized.")
+        return self._app
 
-class AbstractApp(ABC):
+    def on_load(self):
+        pass
+
+    def on_end(self):
+        pass
+
+
+class AbstractApp(ABC, Configurable):
     def __init__(self,
                  layout: AbstractLayout,
                  **kwargs) -> None:
         super(AbstractApp, self).__init__(**kwargs)
+        self._settings = None
         self.layout = layout
+        self.reset_event_dispatchers_table()
+
+    def reset_event_dispatchers_table(self):
         self._event_dispatchers_table = {}
         for t in EventType.get_all_eventTypes():
             self._event_dispatchers_table[t] = {}
+
+    @property
+    def settings(self) -> Settings:
+        if self._settings is None:
+            self._settings = Settings.load(self.data_path)
+        return self._settings
 
     @property
     def event_dispatchers_table(self):
@@ -89,19 +178,67 @@ class AbstractApp(ABC):
         """
         return self._event_dispatchers_table
 
+    @property
+    def path(self):
+        match Config.gui_framework:
+            case GUIFramework.TOGA:
+                return self.paths.app  # type: ignore
+            case GUIFramework.KIVY:
+                from pathlib import Path
+                Path(self.directory)  # type: ignore
+            case _ as ui:
+                raise NotImplementedError(f"Unknown ui_framework: '{ui}'")
+
+    @property
+    def data_path(self):
+        match Config.gui_framework:
+            case GUIFramework.TOGA:
+                return self.paths.data  # type: ignore
+            case GUIFramework.KIVY:
+                from pathlib import Path
+                return Path(self.user_data_dir)  # type: ignore
+            case _ as ui:
+                raise NotImplementedError(f"Unknown ui_framework: '{ui}'")
+
     def on_begin(self):
         """The event handler that will be invoked when the app is about to start.
+
+        It calls only once, in contrast to 'on_load_window', therefore, app settings
+        is called once during the life-cycle of an app.
+
+        It calls the build_layout of Layout instance, stores all UI elements with
+        id and suport of one or more events in event_dispatchers_table, and registers
+        them in ServiceRegistry.
+        """
+        self._set_config()
+        #
+        self.on_load()
+
+    def on_load(self):
+        """The event handler that will be invoked when the app is reset the layout.
+
+        It can be called any time the layout or main window chances, in contrast to
+        'on_begin'.
 
         It calls the build_layout of Layout instance, stores all UI elements with
         id and suport of one or more events in event_dispatchers_table, and registers
         them in ServiceRegistry.
         """
         root = self.layout.build_layout()
+
+        # self.reset_event_dispatchers_table()
         self.__enumerate_elements(root)
-        # Event bindings to dispatcher happens here
+        # Initial Event bindings definitions happens here
         registry = ServiceRegistry()
+        #
+        previous_events = [id for id in registry.events]
+        self.layout._set_config()
+        # Event bindings to dispatcher happens here
+
         for id, event in registry.events.items():
             event_dispatcher = self.event_dispatchers_table[event.eventType.name]
+            if id in previous_events:
+                continue
             if id not in event_dispatcher:
                 raise ValueError(
                     f" Widget id:'{id}' for the {event.eventType.name} handler "
@@ -110,14 +247,18 @@ class AbstractApp(ABC):
             registry.register_service(event,
                                       element,
                                       app=self)
+        #
+        self.layout.on_load()
 
-    def on_end(self):
+    def on_end(self) -> bool:
         """The event handler that will be invoked when the app is about to exit.
 
         It calls the on_exit of all services in the ServiceRegistry.
         """
         registry = ServiceRegistry()
-        registry.on_exit()
+        registry.on_exit(self)
+        self.layout.on_end()
+        self.settings.on_end()
         return True
 
     def __enumerate_elements(self, root):
@@ -157,62 +298,15 @@ class AbstractApp(ABC):
 
         recursive(root)
 
-
-class AbstractEventDispatcher(ABC):
-
-    #
-    @abstractmethod
-    def register(self, event_name: str, handler) -> None:
-        pass
-
-    @abstractmethod
-    def register_framework(self, event_name: str, handler) -> None:
-        pass
-
-    @abstractmethod
-    def register_async(self, event_name: str, async_handler) -> None:
-        pass
-
-    @abstractmethod
-    def register_async_framework(self, event_name: str, async_handler) -> None:
-        pass
-    #
-
-    @abstractmethod
-    def dispatch(self,
-                 event_name: str,
-                 widget: Any,
-                 app: AbstractApp,
-                 extrakwargs: Mapping,
-                 *args,
-                 **kwargs) -> None:
-        pass
-
-    @abstractmethod
-    async def dispatch_async(self,
-                             event_name: str,
-                             widget: Any,
-                             app: AbstractApp,
-                             extrakwargs: Mapping,
-                             *args,
-                             **kwargs) -> None:
-        pass
-
-    @abstractmethod
-    def service_callback(self,
-                         id: str,
-                         widget: Any,
-                         app: AbstractApp,
-                         extrakwargs: Mapping) -> Callable[..., None]:
-        pass
-
-    @abstractmethod
-    def service_async_callback(self,
-                               id: str,
-                               widget: Any,
-                               app: AbstractApp,
-                               extrakwargs: Mapping) -> Callable[..., Coroutine[Any, Any, None]]:
-        pass
+    def _set_config(self):
+        """Os and Framework-related config (e.g. toga or kivy).
+        """
+        if Config.log.to_std:
+            std_out_log()
+        if Config.log.to_file:
+            file_out_log(self.data_path / Config.log.file_name)
+        #
+        super()._set_config()
 
 
 class ServiceRegistry(object):
@@ -228,16 +322,7 @@ class ServiceRegistry(object):
         return cls._instance
 
     __events = {}
-    _dispatcher: AbstractEventDispatcher
-    _ui_framework = UIFramework.TOGA
-
-    @property
-    def ui_framework(self) -> UIFramework:
-        return self._ui_framework
-
-    @ui_framework.setter
-    def ui_framework(self, value: UIFramework):
-        self._ui_framework = value
+    _dispatcher: EventDispatcher
 
     @property
     def dispatcher(self):
@@ -246,6 +331,18 @@ class ServiceRegistry(object):
     @property
     def events(self):
         return self.__events
+
+    def bind(self,
+             *,
+             id: str,
+             eventType: EventType,
+             service,
+             property_name: str = "",  # kivy only, to be used by its bind
+             extra_kwargs: Mapping[str, Any] = {},
+             service_callback: ServiceCallback | None = None) -> None:
+        self.events[id] = Event(id, eventType, service,
+                                property_name, extra_kwargs,
+                                service_callback)
 
     def bind_event(self, event: Event) -> None:
         self.events[event.id] = event
@@ -279,13 +376,15 @@ class ServiceRegistry(object):
 
         def attach(callback):
             # setattr(element, registeredEventType.name.lower(), callback)
-            match self.ui_framework:
-                case UIFramework.TOGA:
-                    from toga.handlers import wrapped_handler
-                    handler = wrapped_handler(element, callback)
+            match Config.gui_framework:
+                case GUIFramework.TOGA:
+                    # from toga.handlers import wrapped_handler  # type: ignore
+
+                    handler = callback  # wrapped_handler(element, callback)
+                    # handler = wrapped_handler(element, callback)
                     # e.g. element.on_press = handler
                     setattr(element, event.eventType.name.lower(), handler)
-                case UIFramework.KIVY:
+                case GUIFramework.KIVY:
                     # Only BIND
                     if event.eventType == EventType.BIND:
                         if event.property_name == "":
@@ -307,7 +406,7 @@ class ServiceRegistry(object):
                         element.bind(**kwrgs)
                 case _:
                     raise ValueError(
-                        f" Unknown UI Framework: {self.ui_framework}")
+                        f" Unknown UI Framework: {Config.gui_framework}")
         #
         element_event = event.element_event(element)
         if hasattr(element_event, "_raw"):
@@ -317,16 +416,17 @@ class ServiceRegistry(object):
 
         #
         match event.service:
-            case SyncServiceStrategy():
+            case SyncService():
                 if handler is not None:
                     self.dispatcher.register_framework(event.id, handler)
                 self.dispatcher.register(event.id, event.service.handle_event)
                 handler_2 = self.dispatcher.service_callback(event.id,
                                                              element,
                                                              app,
+                                                             event.service_callback,
                                                              event.extra_kwargs)
                 attach(handler_2)
-            case AsyncServiceStrategy():
+            case AsyncService():
                 if handler is not None:
                     self.dispatcher.register_async_framework(event.id, handler)
                 self.dispatcher.register_async(
@@ -334,6 +434,7 @@ class ServiceRegistry(object):
                 handler_2 = self.dispatcher.service_async_callback(event.id,
                                                                    element,
                                                                    app,
+                                                                   event.service_callback,
                                                                    event.extra_kwargs)
                 attach(handler_2)
             case _:
@@ -341,7 +442,7 @@ class ServiceRegistry(object):
                     f" Widget id:'{event.id}' ({type(element).__name__}) "
                     f"did not bind to any {event.eventType.name} handler. Check the bindings map.")
 
-    def on_exit(self):
+    def on_exit(self, app):
         """The event handler that will be invoked when the app is about to exit.
 
         It calls the on_exit of all registred services.
@@ -349,14 +450,44 @@ class ServiceRegistry(object):
         for eventInfo in self.events.values():
             eventInfo.service.on_exit()
 
+        # for id, event in self.events.items():
+        #     event_dispatcher = app.event_dispatchers_table[event.eventType.name]
+        #     element = event_dispatcher[id]
+        #     print(element)
 
-class EventDispatcher(AbstractEventDispatcher):
+    def fire_event(self, id, app):
+        event = self.get_event_info(id)
+        event_dispatcher = app.event_dispatchers_table[event.eventType.name]
+        element = event_dispatcher[id]
+        callback = self.dispatcher.service_callback(event.id,
+                                                    element,
+                                                    app,
+                                                    event.service_callback,
+                                                    event.extra_kwargs)
+        callback()
+
+    async def fire_async_event(self, id, app):
+        event = self.get_event_info(id)
+        event_dispatcher = app.event_dispatchers_table[event.eventType.name]
+        element = event_dispatcher[id]
+        callback = self.dispatcher.service_async_callback(event.id,
+                                                          element,
+                                                          app,
+                                                          event.service_callback,
+                                                          event.extra_kwargs)
+        await callback()
+
+
+class EventDispatcher:
     """Event dispatcher that binds the UI elements call back to EventStrategy instances.
 
     This is a lightweight event dispatcher that can support both sync and async calls.
     """
 
     def __init__(self):
+        self.reset_listeners()
+
+    def reset_listeners(self):
         self.listeners = {}
         self.listeners_framework = {}
         self.async_listeners = {}
@@ -428,6 +559,7 @@ class EventDispatcher(AbstractEventDispatcher):
                  event_name: str,
                  widget: Any,
                  app: AbstractApp,
+                 call_back: ServiceCallback | None,
                  extrakwargs: Mapping,
                  *args,
                  **kwargs):
@@ -441,32 +573,56 @@ class EventDispatcher(AbstractEventDispatcher):
             UI element.
         app : AbstractApp
             The AbstractApp subclass that registred the elements.
+        call_back: ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         extrakwargs : Mapping
             Extra key-value paires can be provided to pass to the handler.
             If the value is a callable, it is called each time the event happens.
             This is useful when the arguments need to be updated, e.g., from the
             value in the UI.
         """
-        if ServiceRegistry().ui_framework == UIFramework.TOGA:
-            for callback, sig in self.listeners_framework.get(event_name, []):
-                callback(*args, **kwargs)
+        if Config.gui_framework == GUIFramework.TOGA:
+            for binded_method, sig in self.listeners_framework.get(event_name, []):
+                binded_method(*args, **kwargs)
 
-        for callback in self.listeners.get(event_name, []):
+        for binded_method in self.listeners.get(event_name, []):
             if extrakwargs is None:
-                callback(widget, app, *args, **kwargs)
+                binded_method(widget, app, call_back, *args, **kwargs)
             else:
                 kwargs2 = {}
                 for k, v in extrakwargs.items():
                     if callable(v):
-                        kwargs2[k] = v()
+                        parameters = signature(v).parameters
+                        if len(parameters) > 1:
+                            raise ServiceArgumentError(
+                                message=f"In setting the parameter '{k}', the signuture of "
+                                f"function '{v.__name__}' for service handler "
+                                f"of the {event_name=} must have zero or self argument, it needs "
+                                f"{len(parameters):d} = {list(parameters.keys())}. "
+                                "(You might need to decorate it by @component_method."
+                            )
+                        else:
+                            try:
+                                kwargs2[k] = v()
+                            except TypeError as e:
+                                raise ServiceArgumentError(
+                                    message="Service lazy argument caused an error. "
+                                    "check the function accept zero or at most one "
+                                    "argument, 'self'.",
+                                    cause=e
+                                )
+
                     else:
                         kwargs2[k] = v
-                callback(widget, app, **kwargs2)
+
+                binded_method(widget, app, call_back, **kwargs2)
 
     async def dispatch_async(self,
                              event_name: str,
                              widget: Any,
                              app: AbstractApp,
+                             call_back: ServiceCallback | None,
                              extrakwargs: Mapping,
                              *args,
                              **kwargs):
@@ -480,29 +636,57 @@ class EventDispatcher(AbstractEventDispatcher):
             UI element.
         app : AbstractApp
             The AbstractApp subclass that registred the elements.
+        call_back: ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         extrakwargs : Mapping
             Extra key-value paires can be provided to pass to the handler.
             If the value is a callable, it is called each time the event happens.
             This is useful when the arguments need to be updated, e.g., from the
             value in the UI.
         """
-        if ServiceRegistry().ui_framework == UIFramework.TOGA:
-            for callback, sig in self.async_listeners_framework.get(event_name, []):
-                callback(*args, **kwargs)
-
-        for callback in self.async_listeners.get(event_name, []):
+        if Config.gui_framework == GUIFramework.TOGA:
+            for binded_method, sig in self.async_listeners_framework.get(event_name, []):
+                binded_method(*args, **kwargs)
+        for binded_method in self.async_listeners.get(event_name, []):
             if extrakwargs is None:
-                await callback(widget, app, *args, **kwargs)
+                await binded_method(widget, app, call_back, *args, **kwargs)
             else:
                 kwargs2 = {}
                 for k, v in extrakwargs.items():
                     if callable(v):
-                        kwargs2[k] = v()
+                        parameters = signature(v).parameters
+                        if len(parameters) > 1:
+                            raise ValueError(
+                                f"In setting the parameter '{k}', the signuture of function "
+                                f"'{v.__name__}' for service handler "
+                                f"of the {event_name=} must have zero or self argument, it needs "
+                                f"{len(parameters):d} = {list(parameters.keys())}. "
+                                "(You might need to decorate it by @component_method "
+                                "or @service_callback)."
+                            )
+                        else:
+                            try:
+                                kwargs2[k] = v()
+                            except TypeError as e:
+                                raise ServiceArgumentError(
+                                    message="Service lazy argument caused an error. "
+                                    "check the function accept zero or at most one "
+                                    "argument, 'self'.",
+                                    cause=e
+                                )
+
                     else:
                         kwargs2[k] = v
-                await callback(widget, app, **kwargs2)
 
-    def service_callback(self, id: str, widget: Any, app: AbstractApp, extrakwargs: Mapping):
+                await binded_method(widget, app, call_back, **kwargs2)
+
+    def service_callback(self,
+                         id: str,
+                         widget: Any,
+                         app: AbstractApp,
+                         call_back: ServiceCallback | None,
+                         extrakwargs: Mapping):
         """Create a synchronous widget callback for a ServiceStrategy instance.
 
         Parameters
@@ -513,6 +697,9 @@ class EventDispatcher(AbstractEventDispatcher):
             The UI element that registers the and will call the callback.
         app : AbstractApp
             The application instance.
+        call_back: ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         extrakwargs : Mapping
             Extra argument that maybe provided on binding table.
 
@@ -522,11 +709,17 @@ class EventDispatcher(AbstractEventDispatcher):
             A decorated callback function.
         """
         def callback(*args, **kwargs):
-            self.dispatch(id, widget, app, extrakwargs, *args, **kwargs)
+            self.dispatch(id, widget, app, call_back,
+                          extrakwargs, *args, **kwargs)
 
         return callback
 
-    def service_async_callback(self, id: str, widget: Any, app: AbstractApp, extrakwargs: Mapping):
+    def service_async_callback(self,
+                               id: str,
+                               widget: Any,
+                               app: AbstractApp,
+                               call_back: ServiceCallback | None,
+                               extrakwargs: Mapping):
         """Create an asynchronous widget callback for a ServiceStrategy instance.
 
         Parameters
@@ -537,6 +730,9 @@ class EventDispatcher(AbstractEventDispatcher):
             The UI element that registers the and will call the callback.
         app : AbstractApp
             The application instance.
+        call_back: ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         extrakwargs : Mapping
             Extra argument that maybe provided on binding table.
 
@@ -546,17 +742,22 @@ class EventDispatcher(AbstractEventDispatcher):
             A decorated async callback function.
         """
         async def async_callback(*args, **kwargs):
-            await self.dispatch_async(id, widget, app, extrakwargs, *args, **kwargs)
+            await self.dispatch_async(id, widget, app, call_back, extrakwargs, *args, **kwargs)
 
         return async_callback
 
 
-class SyncServiceStrategy(ServiceStrategy):
+class SyncService(Service):
     """An abstract class for handeling UI sync event callbacks
     """
 
     @abstractmethod
-    def handle_event(self, widget: Any, app: AbstractApp, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app: AbstractApp,
+                     service_callback: ServiceCallback | None,
+                     *args,
+                     **kwargs) -> None:
         """Sync event handler
 
         Parameters
@@ -565,16 +766,24 @@ class SyncServiceStrategy(ServiceStrategy):
             The widget that called the handler.
         app : AbstractApp
             The parent application of the widget.
+        service_callback : ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         """
-        return NotImplemented
+        pass
 
 
-class AsyncServiceStrategy(ServiceStrategy):
+class AsyncService(Service):
     """An abstract class for handeling UI async event callbacks
     """
 
     @abstractmethod
-    async def handle_event(self, widget: Any, app: AbstractApp, *args, **kwargs):
+    async def handle_event(self,
+                           widget: Any,
+                           app: AbstractApp,
+                           service_callback: ServiceCallback | None,
+                           *args,
+                           **kwargs) -> None:
         """Async event handler.
 
         Parameters
@@ -583,5 +792,8 @@ class AsyncServiceStrategy(ServiceStrategy):
             The widget that called the handler.
         app : AbstractApp
             The parent application of the widget.
+        service_callback : ServiceCallback | None
+            The callback function that will be called after the event to
+            send the possible result.
         """
-        return NotImplemented
+        pass

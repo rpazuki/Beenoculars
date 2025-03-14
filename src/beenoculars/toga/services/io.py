@@ -6,22 +6,24 @@ import toga
 from toga import Widget
 
 import beenoculars.core as core
-from beenoculars.core import safe_async_call, safe_call
-from beenoculars.image_processing import Dict
-from beenoculars.toga import LayoutApp
-from beenoculars.toga.image_processing import ToTogaImageProcess
-from beenoculars.toga.image_processing import ToTogaImageProcess as ToTogaImage
+from beenoculars.config import Dict
+from beenoculars.core import ServiceCallback, safe_async_call, safe_call
+from beenoculars.toga.image_processing import ToTogaImage
 
 log = logging.getLogger(__name__)
 
 
-class FileOpenOpenCV(core.AsyncServiceStrategy):
+class FileOpenOpenCV(core.AsyncService):
     def __init__(self) -> None:
         super().__init__()
-        self.toTogaImage = ToTogaImageProcess()
+        self.toTogaImage = ToTogaImage()
 
     @safe_async_call(log)
-    async def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
+    async def handle_event(self,
+                           widget: Any,
+                           app,
+                           service_callback: ServiceCallback | None,
+                           *args, **kwargs):
         import cv2
         fname = await widget.app.dialog(toga.OpenFileDialog("Open file with Toga"))
         if fname is None:
@@ -29,26 +31,37 @@ class FileOpenOpenCV(core.AsyncServiceStrategy):
         # Load and convert the image to a texture
         frame = cv2.imread(str(fname))
         toga_image: Dict = self.toTogaImage(image=frame)
-        app.original_image = toga_image.image
+        if service_callback is not None:
+            service_callback(toga_image)
         return
 
 
-class CaptureByTakePhoto(core.AsyncServiceStrategy):
+class CaptureByTakePhoto(core.AsyncService):
+    def __init__(self) -> None:
+        super().__init__()
+        self.toTogaImage = ToTogaImage()
+
     @safe_async_call(log,
                      {NotImplementedError: "The Camera API is not implemented on this platform.",
                       PermissionError: "You have not granted permission to take photos.", }
                      )
-    async def handle_event(self, widget: Widget, app: LayoutApp, *args, **kwargs):
-        if not app.camera.has_permission:
-            await app.camera.request_permission()
-        image = await app.camera.take_photo()
-        if image:
-            app.original_image = image
+    async def handle_event(self,
+                           widget: Widget,
+                           app,
+                           service_callback: ServiceCallback | None,
+                           *args,
+                           **kwargs):
+        if not app.camera.has_permission:  # type: ignore
+            await app.camera.request_permission()  # type: ignore
+        toga_image = await app.camera.take_photo()  # type: ignore
+        if toga_image:
+            if service_callback is not None:
+                service_callback(Dict(image=toga_image))
         else:
             log.error(" Cannot capture photo.")
 
 
-class CaptureByOpenCV(core.SyncServiceStrategy):
+class CaptureByOpenCV(core.SyncService):
     def __init__(self):
         super().__init__()
         import cv2
@@ -64,7 +77,12 @@ class CaptureByOpenCV(core.SyncServiceStrategy):
         return self.__capture
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app,
+                     service_callback: ServiceCallback | None,
+                     *args,
+                     **kwargs):
         success, frame = self.capture.read()
         counter = 0
         while not success and counter < 20:
@@ -73,7 +91,8 @@ class CaptureByOpenCV(core.SyncServiceStrategy):
             counter += 1
         if success:
             toga_image: Dict = self.toTogaImage(image=frame)
-            app.original_image = toga_image.image
+            if service_callback is not None:
+                service_callback(toga_image)
         else:
             log.error("CaptureByOpenCV: Cannot capture photo.")
 
@@ -82,7 +101,7 @@ class CaptureByOpenCV(core.SyncServiceStrategy):
             self.capture.release()
 
 
-class CaptureByOpenCVThread(core.SyncServiceStrategy):
+class CaptureByOpenCVThread(core.SyncService):
     @safe_call(log)
     def __init__(self):
         super().__init__()
@@ -95,9 +114,13 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
         self.__thread.start()
 
     @safe_call(log)
-    def handle_event(self, widget: Any, app: LayoutApp, *args, **kwargs):
+    def handle_event(self,
+                     widget: Any,
+                     app,
+                     service_callback: ServiceCallback | None,
+                     *args,
+                     **kwargs):
         from beenoculars.camera_thread import CaptureThreadGlobals
-
         frame = CaptureThreadGlobals.frame
         counter = 0
         while frame is None and counter < 20:
@@ -106,7 +129,8 @@ class CaptureByOpenCVThread(core.SyncServiceStrategy):
             counter += 1
         if frame is not None:
             toga_image: Dict = self.toTogaImage(image=frame)
-            app.original_image = toga_image.image
+            if service_callback is not None:
+                service_callback(toga_image)
         else:
             log.error("CaptureByOpenCVThread: Cannot capture photo.")
 
