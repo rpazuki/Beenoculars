@@ -6,6 +6,7 @@ name = "toga"
 to_std = true
 to_file = true
 file_name = "beenocular.log"
+log_level = "INFO"
 
 [toga]
 

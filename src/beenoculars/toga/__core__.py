@@ -75,7 +75,7 @@ class TogaComponent(Component[toga.Box], Configurable, toga.Box):
         return self._layout.ml_app
 
     @property
-    def parrent_layout(self) -> TogaStackedLayout:
+    def parent_layout(self) -> TogaStackedLayout:
         return self._layout
 
 

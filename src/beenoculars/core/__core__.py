@@ -132,7 +132,7 @@ class AbstractLayout(ABC, Configurable):
         return type(self).__qualname__
 
     @abstractmethod
-    def build_layout(self) -> Any:
+    def build_layout(self, app) -> Any:
         pass
 
     @property
@@ -224,7 +224,7 @@ class AbstractApp(ABC, Configurable):
         id and suport of one or more events in event_dispatchers_table, and registers
         them in ServiceRegistry.
         """
-        root = self.layout.build_layout()
+        root = self.layout.build_layout(self)
 
         # self.reset_event_dispatchers_table()
         self.__enumerate_elements(root)
@@ -302,9 +302,10 @@ class AbstractApp(ABC, Configurable):
         """Os and Framework-related config (e.g. toga or kivy).
         """
         if Config.log.to_std:
-            std_out_log()
+            std_out_log(log_level=Config.log.log_level)
         if Config.log.to_file:
-            file_out_log(self.data_path / Config.log.file_name)
+            file_out_log(path=self.data_path / Config.log.file_name,
+                         log_level=Config.log.log_level)
         #
         super()._set_config()
 

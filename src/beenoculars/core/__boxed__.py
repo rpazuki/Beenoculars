@@ -26,7 +26,7 @@ class Layout[Box](AbstractLayout):
             raise ValueError("box has not been initialized (_build_box).")
         return self._box
 
-    def build_layout(self) -> Box:
+    def build_layout(self, app) -> Box:
         """Build the main window of the app and its layout.
         """
         #
@@ -141,7 +141,7 @@ class StackedLayout[Box, *Ts](Layout[Box]):
     def _name(self) -> str:
         return ":".join(t.__qualname__ for t in self.types)
 
-    def build_layout(self) -> Box:
+    def build_layout(self, app) -> Box:
         #
         self._build_box()
         #

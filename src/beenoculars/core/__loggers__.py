@@ -24,19 +24,21 @@ class OneLineExceptionFormatter(logging.Formatter):
         return result
 
 
-def std_out_log(LOGGER_FORMAT=logging.BASIC_FORMAT):
+def std_out_log(log_level="INFO",
+                LOGGER_FORMAT=logging.BASIC_FORMAT):
     handler = logging.StreamHandler()
     # LOGGER_FORMAT = "%(levelname)s:%(name)s:%(message)s \n %(pathname)s @ %(lineno)d"
     # LOGGER_FORMAT = "%(levelname)s:%(name)s:%(message)s (in %(filename)s @ line %(lineno)d)"
     formatter = OneLineExceptionFormatter(LOGGER_FORMAT)
     handler.setFormatter(formatter)
     # root = logging.getLogger()
-    root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+    root.setLevel(os.environ.get("LOGLEVEL", log_level))
     if is_not_kivy:
         root.addHandler(handler)
 
 
 def file_out_log(path,
+                 log_level="INFO",
                  LOGGER_FORMAT="%(levelname)s:%(asctime)s:%(name)s:%(message)s"):
     import logging.handlers
 
@@ -62,7 +64,7 @@ def file_out_log(path,
     handler.setFormatter(formatter)
     # root = logging.getLogger()
     root.addHandler(handler)
-    root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+    root.setLevel(os.environ.get("LOGLEVEL", log_level))
 
 
 def __dummy__():
