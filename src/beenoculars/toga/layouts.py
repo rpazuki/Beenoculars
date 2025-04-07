@@ -31,7 +31,7 @@ class ImageInputComponent(TogaComponent):
             direction=ROW, alignment=CENTER, padding=1),
             children=[
                 toga.Button("Open",
-                            id="file_open_cv",
+                            id="file_open",
                             style=Pack(padding=5)),
                 toga.Button("Capture",
                             id="capture",
@@ -47,18 +47,18 @@ class ImageInputComponent(TogaComponent):
     def image_loaded(self, toga_image):
         self.parent_layout.image_loaded(toga_image)  # type: ignore
 
-    def on_common_config(self):
-        ##
-        registry = ServiceRegistry()
-        registry.bind_event(
-            Event("file_open_cv",
+    def image_loaded_by_path(self, path):
+        toga_image = toga.Image(path)
+        self.parent_layout.image_loaded(toga_image)  # type: ignore
+
+    def on_linux_config(self):
+        #
+        ServiceRegistry().bind_event(
+            Event("file_open",
                   EventType.ON_PRESS,
                   FileOpenOpenCV(),
                   service_callback=self.image_loaded)
         )
-
-    def on_linux_config(self):
-        #
         ServiceRegistry().bind_event(
             Event("capture",
                   EventType.ON_PRESS,
@@ -69,6 +69,12 @@ class ImageInputComponent(TogaComponent):
     def on_darwin_config(self):
         #
         ServiceRegistry().bind_event(
+            Event("file_open",
+                  EventType.ON_PRESS,
+                  FileOpenOpenCV(),
+                  service_callback=self.image_loaded)
+        )
+        ServiceRegistry().bind_event(
             Event("capture",
                   EventType.ON_PRESS,
                   CaptureByTakePhoto(),
@@ -77,6 +83,13 @@ class ImageInputComponent(TogaComponent):
 
     def on_ios_config(self):
         #
+        from beenoculars.services.open_file_ios import IOSFileOpen
+        ServiceRegistry().bind_event(
+            Event("file_open",
+                  EventType.ON_PRESS,
+                  IOSFileOpen(allowsMultipleSelection=False),
+                  service_callback=self.image_loaded_by_path)
+        )
         ServiceRegistry().bind_event(
             Event("capture",
                   EventType.ON_PRESS,
@@ -86,6 +99,13 @@ class ImageInputComponent(TogaComponent):
 
     def on_ipados_config(self):
         #
+        from beenoculars.services.open_file_ios import IOSFileOpen
+        ServiceRegistry().bind_event(
+            Event("file_open",
+                  EventType.ON_PRESS,
+                  IOSFileOpen(allowsMultipleSelection=False),
+                  service_callback=self.image_loaded_by_path)
+        )
         ServiceRegistry().bind_event(
             Event("capture",
                   EventType.ON_PRESS,
@@ -95,6 +115,12 @@ class ImageInputComponent(TogaComponent):
 
     def on_windows_config(self):
         #
+        ServiceRegistry().bind_event(
+            Event("file_open",
+                  EventType.ON_PRESS,
+                  FileOpenOpenCV(),
+                  service_callback=self.image_loaded)
+        )
         ServiceRegistry().bind_event(
             Event("capture",
                   EventType.ON_PRESS,

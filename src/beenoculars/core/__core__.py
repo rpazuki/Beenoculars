@@ -349,7 +349,7 @@ class ServiceRegistry(object):
         self.events[event.id] = event
 
     def get_event_info(self, id) -> Event:
-        return self.events.get(id, None)
+        return self.events.get(id, None)  # type: ignore
 
     def register_service(self, event: Event, element: Any, app: AbstractApp):
         """Register a ServiceStrategy for the given event, UI element and app.

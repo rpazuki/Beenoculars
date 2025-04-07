@@ -182,6 +182,7 @@ requires = [
 requires = [
     "toga-iOS~=0.4.7",
     "std-nslog~=1.0.3",
+    "rubicon-objc",
 ]
 requirement_installer_args = ["--find-links", "/Users/rp/ios_libs/mobile-forge/dist/"]
 permission.camera = "This iOS app uses the camera"
