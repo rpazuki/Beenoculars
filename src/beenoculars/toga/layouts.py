@@ -6,7 +6,7 @@ from toga.style import Pack
 from toga.style.pack import CENTER, COLUMN, ROW  # type: ignore
 
 import beenoculars.core as core
-from beenoculars.config import Config
+from beenoculars.config import Config, Dict
 from beenoculars.core import Event, EventType, ServiceRegistry, silence_crossed_events
 from beenoculars.services import OverlayContoursService as OverlayContours
 from beenoculars.toga import (
@@ -47,9 +47,9 @@ class ImageInputComponent(TogaComponent):
     def image_loaded(self, toga_image):
         self.parent_layout.image_loaded(toga_image)  # type: ignore
 
-    def image_loaded_by_path(self, path):
-        toga_image = toga.Image(path)
-        self.parent_layout.image_loaded(toga_image)  # type: ignore
+    def image_loaded_as_pillow(self, image):
+        toga_image = toga.Image(image)
+        self.parent_layout.image_loaded(Dict(image=toga_image))  # type: ignore
 
     def on_linux_config(self):
         #
@@ -83,12 +83,15 @@ class ImageInputComponent(TogaComponent):
 
     def on_ios_config(self):
         #
-        from beenoculars.services.open_file_ios import IOSFileOpen
+        from beenoculars.services.photo_picker_ios import (
+            ImagePickerReturn,
+            IOSPhotoPicker,
+        )
         ServiceRegistry().bind_event(
             Event("file_open",
                   EventType.ON_PRESS,
-                  IOSFileOpen(allowsMultipleSelection=False),
-                  service_callback=self.image_loaded_by_path)
+                  IOSPhotoPicker(ImagePickerReturn.IMAGE),
+                  service_callback=self.image_loaded_as_pillow)
         )
         ServiceRegistry().bind_event(
             Event("capture",
@@ -99,12 +102,15 @@ class ImageInputComponent(TogaComponent):
 
     def on_ipados_config(self):
         #
-        from beenoculars.services.open_file_ios import IOSFileOpen
+        from beenoculars.services.photo_picker_ios import (
+            ImagePickerReturn,
+            IOSPhotoPicker,
+        )
         ServiceRegistry().bind_event(
             Event("file_open",
                   EventType.ON_PRESS,
-                  IOSFileOpen(allowsMultipleSelection=False),
-                  service_callback=self.image_loaded_by_path)
+                  IOSPhotoPicker(ImagePickerReturn.IMAGE),
+                  service_callback=self.image_loaded_as_pillow)
         )
         ServiceRegistry().bind_event(
             Event("capture",
