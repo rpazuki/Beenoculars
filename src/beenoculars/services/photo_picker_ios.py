@@ -121,14 +121,19 @@ class IOSPhotoPicker(core.AsyncService):
                     #     service_callback( Image.open(io.BytesIO(png)))
                     #     return
                     path_str = ""
+                    file = None
                     for key, value in info_dict.items():
                         if py_from_ns(key) == "UIImagePickerControllerImageURL":
                             path_str: str = py_from_ns(
                                 value.path)  # type: ignore
+                        if py_from_ns(key) == "UIImagePickerControllerOriginalImage":
+                            file = value
                     if path_str != "":
                         from PIL import Image
-                        service_callback(Image.open(Path(path_str)))
-                        service_callback(Path(path_str))
+                        # file.startAccessingSecurityScopedResource()
+                        img = Image.open(Path(path_str))
+                        # file.stopAccessingSecurityScopedResource()
+                        service_callback(img)
                         return
 
                     # Set the service callback

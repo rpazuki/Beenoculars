@@ -1,4 +1,5 @@
 import logging
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +10,10 @@ from rubicon.objc import (
     objc_const,
     objc_method,
     py_from_ns,
+    at,
 )
 from rubicon.objc.runtime import load_library, objc_id
+from rubicon.objc.runtime import Foundation
 
 import beenoculars.core as core
 from beenoculars.core import safe_async_call
@@ -24,11 +27,16 @@ NSObject = ObjCClass("NSObject")
 UIViewController = ObjCClass("UIViewController")
 UIDocumentPickerDelegate = ObjCProtocol("UIDocumentPickerDelegate")
 NSURL = ObjCClass("NSURL")
+NSString = ObjCClass("NSString")
 NSNotificationCenter = ObjCClass('NSNotificationCenter')
+NSLOG = Foundation.NSLog
+
+NSFileManager = ObjCClass('NSFileManager')
 
 
 class DocumentPickerDelegate(NSObject,  # type: ignore
                              protocols=[UIDocumentPickerDelegate]):  # type: ignore
+    
 
     @objc_method
     def init_(self):
@@ -46,11 +54,13 @@ class DocumentPickerDelegate(NSObject,  # type: ignore
     def get_serviceCallback(self):
         return self.serviceCallback
 
+
     @objc_method
     def documentPicker_didPickDocumentsAtURLs_(self, picker: objc_id, urls: objc_id) -> None:
         # Handle the selected files
         if self.serviceCallback is not None:
             self.serviceCallback(urls)  # type: ignore
+        
         keyWindow = UIApplication.sharedApplication.keyWindow  # type: ignore
         keyWindow.rootViewController.dismissViewControllerAnimated_completion_(
             True, None)
@@ -64,23 +74,19 @@ class DocumentPickerDelegate(NSObject,  # type: ignore
 
 class IOSFileOpen(core.AsyncService):
     def __init__(self,
-                 document_types: list[str] = ["UTTypePNG",
-                                              "UTTypeJPEG",
-                                              "UTTypeWebP",
-                                              "UTTypeTIFF",
-                                              "UTTypeGIF",
-                                              "UTTypeBMP",
-                                              "UTTypeRAWImage",
-                                              #   "UTTypeImage"
-                                              ],
-                 allowsMultipleSelection: bool = True) -> None:
+                 temp_path:Path,
+                 document_types: list[str] = ["UTTypeMP3"],
+                 allowsMultipleSelection: bool = True,
+                 ) -> None:
         super().__init__()
         # IMPORTANT: the delegate must be create and store here
         # because the delegate is a weak reference
         # and can be deleted without any reference in Python side
         self.delegate = DocumentPickerDelegate.alloc().init_()
+        self.temp_path = temp_path
         self.document_types = document_types
         self.allowsMultipleSelection = allowsMultipleSelection
+        self.libcf = load_library("UniformTypeIdentifiers")
 
     @safe_async_call(log)
     async def handle_event(self,
@@ -90,9 +96,9 @@ class IOSFileOpen(core.AsyncService):
                            *args, **kwargs):
         if service_callback is None:
             raise ValueError("service_callback must be provided")
-        libcf = load_library("UniformTypeIdentifiers")
+
         # You can specify other UTIs if needed
-        document_types = [objc_const(libcf, item)
+        document_types = [objc_const(self.libcf, item)
                           for item in self.document_types]
         picker = UIDocumentPickerViewController.alloc()  # type: ignore
         picker = picker.initForOpeningContentTypes_(
@@ -104,10 +110,20 @@ class IOSFileOpen(core.AsyncService):
             fnames_c_list = py_from_ns(fnames_c)
             fnames = []
             for item in fnames_c_list:  # type: ignore
-                # Convert NSURL to string
+                # All files are copied to local sandbox , before
+                # the service caller's callback is called.
+                # Therefore, all paths are updated accordingly
+                # This steps must happen between a SecurityScope block
+                item.startAccessingSecurityScopedResource()
                 path_str: str = py_from_ns(item.path)  # type: ignore
-                # Convert to Path object
-                fnames.append(Path(path_str))
+                f_src = open(path_str, 'rb')
+                dest_path = self.temp_path / Path(path_str).name
+                f_dest = open(dest_path, 'wb')
+                shutil.copyfileobj(f_src, f_dest)                
+                item.stopAccessingSecurityScopedResource()
+                # store the converted Path object
+                fnames.append(dest_path)
+
             if self.allowsMultipleSelection:
                 service_callback(fnames)
             else:
